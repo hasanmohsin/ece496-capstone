@@ -149,41 +149,7 @@ class ReferenceResolver:
                         #append the noun chunk the token is in
                         if noun not in act_ent_dict[action]:
                             act_ent_dict[action].append(noun)
-        """
-        #try to find entities related to this action
-        for action in actions:
 
-            obj_ent = []
-
-            possible_ents = [child for child in action.children]
-
-            #for this action token, each child path is an entity
-            for ents in possible_ents:
-                obj = None
-
-                #print("\nAt child {}".format(child.text))
-
-                #first check if this child token is in some noun chunk: if so, 
-                #add the entire noun_chunk as an object
-                if any([(ents.text in chunk) for chunk in noun_chunks]):
-                    
-                    for noun_chunk in noun_chunks:
-                        if ents.text in noun_chunk:
-                            obj = noun_chunk
-                            #print(obj)
-                            break
-                #we explore 
-                #its children depth first and add the noun phrases they are in
-                else:
-                    #append its children to possible ents
-                    for next_child in ents.children:
-                        possible_ents.append(next_child)
-                
-                #put into object dictionary
-                if obj:
-                    obj_ent.append(obj)
-            act_ent_dict[action.text] = obj_ent
-        """
 
         return act_ent_dict
 
@@ -199,8 +165,6 @@ class ReferenceResolver:
     def parse_step(self, step_sent):
         #first find the entities
         doc = self.nlp(step_sent)
-
-        noun_chunks = [chunk.text for chunk in doc.noun_chunks]
 
         #parse the sentence into predicates, and object arrays related to them
         #each action step will get 1 predicate, a list of dobj, and a list of pp
@@ -224,6 +188,16 @@ class ReferenceResolver:
                 #get substring corresponding to pp or dobj
                 ent_span = doc[token.left_edge.i : token.right_edge.i+1]
 
+                #want our action steps to be non-overlapping
+                #check if the action is either already added
+
+                #or if it is not part of an entity in the existing dictionary
+                #if this  = True, it already in list
+                #skip this action
+                #NOTE: take this out to have multiple actions per step and allow overlapping (eg. an action step is a substep of another)
+                if any([action_step.hasTokenEntity(action) for action_step in action_step_dict.values()]):
+                    continue
+
                 if action.text not in action_step_dict.keys():
                         #create action step for it
                         action_step = ActionStep(pred = action.text)
@@ -236,80 +210,71 @@ class ReferenceResolver:
                     elif token.dep_ == "dobj":
                         action_step_dict[action.text].addDOBJ(Entity(ent_span, "DOBJ"))
 
-        """
-        #then add any remaining direct objects (not corresponding to pp)
-        for token in doc:
-                #if a the token is a direct object
-                if token.dep_ == "dobj":
-                    #keep iterating up until you get action that is a 'VERB'
-                    action = token.head
-
-                    #we stop at first verb up or until we get to root 
-                    while action.pos_ != "VERB" and action.head != action:
-                        #print(action)
-                        action = action.head
-                    
-                    #create action_step for this verb
-                    #right now don't assign id, will do later when in order
-                    #action_step = ActionStep(act_id = -1, action)
-
-                    #get substring corresponding to dobj
-                    dobj_span = doc[token.left_edge.i : token.right_edge.i+1]
-
-                    #check if not seen this action before
-                    if action not in action_step_dict.keys():
-                        #create action step for it
-                        action_step = ActionStep(pred = action)
-                        action_step_dict[action] = action_step
-                    
-                    #add if not already in action_step_dict for this action
-                    if not dobj_span in action_step_dict[action]:
-                        action_step_dict[action].addDOBJ(Entity(dobj_span, "DOBJ"))
-
-                    #find noun chunk this token is in
-                    #for noun in doc.noun_chunks:
-                    #    if token in noun:
-                    #        #add the noun chunk the token is in to the action_step DOBJ list, if not already added
-                    #        #(as part of DOBJ or PP lists)
-                    #        if not noun in action_step_dict[action]:
-                    #            action_step_dict[action].addDOBJ(Entity(noun, "DOBJ"))
-        """
 
         return action_step_dict
 
     #sent is a sentence over multiple steps for video
-    #corrects the action ids in action_step_dict
-    def order_ids(self, sent, action_step_dict):
+    #corrects the action ids in action_step_list
+    def order_ids(self, sent, action_step_list):
         doc = self.nlp(sent)
 
-        print(action_step_dict.keys())
+        ordered_action_step_list = []
+
+        #we take in an action step list, and produce another list
+        #with the correct ordering, and with action IDs filled
 
         count = 0
         for token in doc:
             #print("At token: {}".format(token.text))
-            if token.text in action_step_dict.keys():
-                #print("At count : {}".format(count))
-                action_step_dict[token.text].setActId(count)
-                count +=1
+            #if the token text is part of the predicate
+            for action_step in action_step_list:
+                #each action step is labelled once, and no other action 
+                #step gets the same value
+                #only set if not set yet
+                if token.text in action_step.pred and action_step.act_id == -1:
+                    #print("At count : {}".format(count))
+                    action_step.setActId(count)
 
-        return action_step_dict
+                    ordered_action_step_list.append(action_step)
+                    count +=1
+                    break
 
-    #returns pred (text) and action ID the given token is in
-    #"" and -1 if not found
-    def find_action_step_for_token(self, token, action_step_dict):
-        for pred_key in action_step_dict.keys():
+        return ordered_action_step_list
+
+    #returns action ID the given token is in (as a pred, dobj or pp)
+    #in most cases the token should be an entity (not a predicate)
+    #-1 if not found
+    def find_action_step_for_token(self, token, action_step_list):
+        for action_step in action_step_list:
             #the token is a predicate for this action step
-            if action_step == pred_key:
-                return pred_key, action_step_dict[pred_key].act_id
+            if action_step.pred == token.text:
+                return action_step.act_id
 
 
-            if action_step_dict[pred_key].hasTokenEntity(token):
-                return pred_key, action_step_dict[pred_key].act_id
+            if action_step.hasTokenEntity(token):
+                return action_step.act_id
 
-        return "", -1
+        return -1
+
+    #given a list of strings, each corresponding to each step, produces 
+    #a list of action_steps, ordered with action IDs
+    def parse_step_list(self, step_text_list):
+        action_step_list = []
+
+        #parse each step individually to action_steps
+        for step in step_text_eg:
+            action_step_dict = self.parse_step(step)
+            action_step_list = action_step_list + list(action_step_dict.values())
+
+        #now order them, going through the step list
+        all_steps = " , ".join(step_text_list)
+
+        action_step_list = self.order_ids(all_steps, action_step_list)
+
+        return action_step_list
 
     #creates dictionary, where key = entity, value = list of actions entity refers to
-    def resolve_refs_after_parse(self, step_text_list, action_step_dict):
+    def resolve_refs_after_parse(self, step_text_list, action_step_list):
 
         #next do coreference resolution
         sentence = ", then ".join(step_text_list)
@@ -332,24 +297,41 @@ class ReferenceResolver:
 
                         #find action step token is in, 
                         #find the action step main is in, and set the reference id
-                        pred_token, token_action_id = self.find_action_step_for_token(token, action_step_dict)
-                        pred_ref, ref_action_id = self.find_action_step_for_token(main, action_step_dict)
+                        token_action_id = self.find_action_step_for_token(token, action_step_list)
+                        ref_action_id = self.find_action_step_for_token(main, action_step_list)
                         
                         #looks at entities corresponding to this token for this action step, and inserts the
                         #action ID they refer to for them
-                        if pred_token != "":
-                            action_step_dict[pred_token].set_references(token, ref_action_id)
+                        if token_action_id != -1 and token_action_id != ref_action_id:
+                            action_step_list[token_action_id].set_references(token, ref_action_id)
 
                         #ref_dict[token].append(main)
-        return action_step_dict
+        return action_step_list
 
-        #main run method
-        #pass a list of steps (strings)
-        #this will parse them all, and resolve references
-        #returning dictionary, key = predicate text, value = ActionStep object
-        #def parse_and_resolve_all_refs(self, step_list):
-            
-        #    for step in step_list:
+    #main run method
+    #pass a list of steps (strings)
+    #this will parse them all, and resolve references
+    #returning action_step_list, of ActionStep objects
+    def parse_and_resolve_all_refs(self, step_list):
+        #parse the steps
+        action_step_list = rr_model.parse_step_list(step_list)
+        
+        #now do reference resolution
+        action_step_list = rr_model.resolve_refs_after_parse(step_list, action_step_list)
+        
+        return action_step_list
+    
+    def print_action_step_list(self, action_step_list):
+        for action_step in action_step_list:
+            print("\nAction ID: {}".format(action_step.act_id))
+            print("PRED: {}".format(action_step.pred))
+
+            dobj_list_str = [(dobj.ent_text.text + " (Refers to action ID: {})".format(dobj.act_id_ref)) for dobj in action_step.dobj_list]
+            pp_list_str = [(pp.ent_text.text + " (Refers to action ID: {})".format(pp.act_id_ref)) for pp in action_step.pp_list]
+
+            print("DOBJ: {}".format(dobj_list_str))
+            print("PP: {}".format(pp_list_str))
+        return
 
 rr_model = ReferenceResolver()
 
@@ -363,6 +345,8 @@ eg_text_2 = "drizzle little bit of olive oil on both the sides of 4 bread slices
 
 #NOTE: action step pred is a string, but for Entities, the ent_text is a Spacy object. use .text to get actual
 #string
+
+"""
 action_step_dict = rr_model.parse_step(eg_text_2)
 action_step_dict = rr_model.order_ids(eg_text_2, action_step_dict)
 
@@ -381,3 +365,17 @@ for action_step in action_steps:
 
     print("DOBJ: {}".format(dobj_list_str))
     print("PP: {}".format(pp_list_str))
+
+"""
+
+
+step_text_eg = ['pour into the ingredients',
+ 'pour into the ingredients',
+ 'stir the mixture',
+ 'pour in after mixing it',
+ 'decorate with fruit']
+
+
+action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg)
+
+rr_model.print_action_step_list(action_step_list)
