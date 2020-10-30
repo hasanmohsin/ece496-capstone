@@ -54,15 +54,18 @@ def compare_entity(p_text, g_text):
 
     #print(len(p_root_nouns))
     #print(len(g_root_nouns))
+
+    if len(p_root_nouns) == 0:
+        p_root_nouns.append(p_text)
+
+    if len(g_root_nouns) == 0:
+        g_root_nouns.append(g_text)
     
     pair_scores = np.zeros((len(p_root_nouns), len(g_root_nouns)))
 
     for i, p_root_noun in enumerate(p_root_nouns):
         for j, g_root_noun in enumerate(g_root_nouns):
             pair_scores[i,j] = is_similar(g_root_noun, p_root_noun)
-
-    if len(p_root_nouns) == 0 or len(g_root_nouns) == 0:
-        return 0
 
     return np.amax(pair_scores)
 
