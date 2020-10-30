@@ -1,0 +1,8 @@
+Reference resolution annotations from https://finding-it.github.io.
+
+Annotations are licensed under the Creative Commons CC-By-4.0 License. You
+can see view the license at https://creativecommons.org/licenses/by/4.0/.
+
+Changes made:
+  - We noticed that the WEBVTT tag is on the second line of the files. We
+    fixed this by deleting the blank first line in each of the files.
