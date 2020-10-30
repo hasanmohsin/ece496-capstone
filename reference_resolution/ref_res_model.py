@@ -384,10 +384,10 @@ class ReferenceResolver:
     #returning action_step_list, of ActionStep objects
     def parse_and_resolve_all_refs(self, step_list):
         #parse the steps
-        action_step_list = rr_model.parse_step_list(step_list)
+        action_step_list = self.parse_step_list(step_list)
         
         #now do reference resolution
-        action_step_list = rr_model.resolve_refs_after_parse(step_list, action_step_list)
+        action_step_list = self.resolve_refs_after_parse(step_list, action_step_list)
         
         return action_step_list
     
@@ -407,7 +407,7 @@ class ReferenceResolver:
             count+=1
         return
 
-rr_model = ReferenceResolver()
+#rr_model = ReferenceResolver()
 
 eg_text_1 = "Grab the spatula and use it to mix it with the dried onions." 
 eg_text_2 = "drizzle little bit of olive oil on both the sides of 4 bread slices"
@@ -480,11 +480,12 @@ step_text_eg_2 = ['Preheat the oven at 425 degree',
 
 #print(step_text_eg_2)
 
-action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg_2)
+#action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg_2)
 
 
 #assumes 1 action per step!
-rr_model.print_action_step_list(step_text_eg_2, action_step_list)
+
+#rr_model.print_action_step_list(step_text_eg_2, action_step_list)
 
 #rr_model.write_action_step_list_file(action_step_list, './examples/action_step_list')
 
@@ -493,3 +494,6 @@ rr_model.print_action_step_list(step_text_eg_2, action_step_list)
 #sentence = ", then ".join(step_text_eg_2)
 #doc = rr_model.nlp(sentence)
 #print(doc._.coref_clusters)
+
+#test evaluate function
+#evaluate(action_step_list, action_step_list)
