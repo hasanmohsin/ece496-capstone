@@ -68,10 +68,10 @@ def evaluate(p_steps, g_steps):
 
     pred_mismatch = 0
 
-    p_unmatched = set(p_steps.dobj_list + p_steps.pp_list)
-    g_unmatched = set(g_steps.dobj_list + g_steps.pp_list)
-
     for p_action_step, g_action_step in zip(p_steps, g_steps):
+        p_unmatched = set(p_action_step.dobj_list + p_action_step.pp_list)
+        g_unmatched = set(g_action_step.dobj_list + g_action_step.pp_list)
+
         if similar(p_action_step.pred, g_action_step.pred):
             pairs_1 = CompareEntities(p_action_step.dobj_list, g_action_step.dobj_list)
             pairs_2 = CompareEntities(p_action_step.pp_list, g_action_step.pp_list)
@@ -94,17 +94,17 @@ def evaluate(p_steps, g_steps):
         else:
             pred_mismatch = pred_mismatch + 1
 
-    for entity in p_unmatched:
-        if entity.act_id_ref == -1:
-            false_negative_parse += 1
-        else:
-            false_positive_parse += 1
+        for entity in p_unmatched:
+            if entity.act_id_ref == -1:
+                false_negative_parse += 1
+            else:
+                false_positive_parse += 1
 
-    for entity in g_unmatched:
-        if entity.act_id_ref == -1:
-            false_positive_parse += 1
-        else:
-            false_negative_parse += 1
+        for entity in g_unmatched:
+            if entity.act_id_ref == -1:
+                false_positive_parse += 1
+            else:
+                false_negative_parse += 1
 
     return Stat(true_positive, true_negative, false_positive, false_negative, false_positive_parse, false_negative_parse, pred_mismatch)
 
