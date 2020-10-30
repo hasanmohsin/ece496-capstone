@@ -8,6 +8,15 @@ from ref_res_model import nlp
 threshold = 0.8
 
 class Stat:
+    def __init__(self):
+        self.true_positive = 0
+        self.true_negative = 0
+        self.false_positive = 0
+        self.false_negative = 0
+        self.false_positive_parse = 0
+        self.false_negative_parse = 0
+        self.pred_mismatch = 0
+
     def __init__(self, tp, tn, fp, fn, fpp, fnp, pm):
         self.true_positive = tp
         self.true_negative = tn
@@ -16,6 +25,16 @@ class Stat:
         self.false_positive_parse = fpp
         self.false_negative_parse = fnp
         self.pred_mismatch = pm
+
+    def __add__(self, other):
+        self.true_positive += other.true_positive
+        self.true_negative += other.true_negative
+        self.false_positive += other.false_positive
+        self.false_negative += other.false_negative
+        self.false_positive_parse += other.false_positive_parse
+        self.false_negative_parse += other.false_negative_parse
+        self.pred_mismatch += other.pred_mismatch
+        
 
 def root_nouns(s):
     doc = nlp(s.text)
