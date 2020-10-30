@@ -7,6 +7,16 @@ from ref_res_model import nlp
 
 threshold = 0.8
 
+class Stat:
+    def __init__(self, tp, tn, fp, fn, fpp, fnp, pm):
+        self.true_positive = tp
+        self.true_negative = tn
+        self.false_positive = fp
+        self.false_negative = fn
+        self.false_positive_parse = fpp
+        self.false_negative_parse = fnp
+        self.pred_mismatch = pm
+
 def root_nouns(s):
     doc = nlp(s)
     return [noun.root for noun in doc.noun_chunks]
@@ -84,14 +94,18 @@ def evaluation(p_steps, g_steps):
         else:
             pred_mismatch = pred_mismatch + 1
 
-        for entity in p_unmatched:
-            if entity.act_id_ref == -1:
-                false_negative_parse += 1
-            else:
-                false_positive_parse += 1
+    for entity in p_unmatched:
+        if entity.act_id_ref == -1:
+            false_negative_parse += 1
+        else:
+            false_positive_parse += 1
 
-        for entity in g_unmatched:
-            if entity.act_id_ref == -1:
-                false_positive_parse += 1
-            else:
-                false_negative_parse += 1
+    for entity in g_unmatched:
+        if entity.act_id_ref == -1:
+            false_positive_parse += 1
+        else:
+            false_negative_parse += 1
+
+    return Stat(true_positive, true_negative, false_positive, false_negative, false_positive_parse, false_negative_parse, pred_mismatch)
+
+        
