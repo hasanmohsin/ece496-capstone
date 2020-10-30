@@ -109,6 +109,12 @@ class Entity:
         self.act_id_ref = ref_act_id
         return
 
+    def __eq__(self, other):
+        return (self.ent_text == other.ent_text) and (self.ent_type == other.ent_type) and (self.act_id_ref == other.act_id_ref)
+
+    def __hash__(self):
+        return hash(self.ent_text + self.ent_type + self.act_id_ref)
+
     def __str__(self):
         return 'Type: {}, Entity Text: {}, Action ID: {}'.format(self.ent_type, self.ent_text, self.act_id_ref)
 
