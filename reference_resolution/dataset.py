@@ -50,14 +50,14 @@ class FI_YCII(Dataset):
         raw_entities = [raw_entity.strip() for raw_entity in raw_entities]
         
         entities = []
-        
+
         for raw_entity in raw_entities:
             split = raw_entity.rsplit(' ', 1)
-            action_id = re.search('\((.*\d*)\)', split[0])
+            action_id = re.search('\((.*\d*)\)', raw_entity)
             
             # Sometimes entity texts or action IDs are null.
             if action_id and len(split) == 2:
-                entities.append(Entity(split[0], entity_type, split[1]))
+                entities.append(Entity(split[0], entity_type, action_id.group(1)))
             elif action_id:
                 entities.append(Entity(None, entity_type, action_id.group(1)))
             else:
