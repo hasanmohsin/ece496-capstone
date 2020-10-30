@@ -21,7 +21,7 @@ def root_nouns(s):
     doc = nlp(s)
     return [noun.root for noun in doc.noun_chunks]
 
-def is_similiar(s1, s2)
+def is_similiar(s1, s2):
     return SequenceMatcher(None, s1, s2).ratio()
 
 def compare_entities(p_entities, g_entities):
@@ -32,7 +32,7 @@ def compare_entities(p_entities, g_entities):
         for j, g_entity in enumerate(g_entity):
             pair_score[i][j] = CompareEntity(p_entity.ent_text, g_entity.ent_text)
 
-    for iterations(len(g_entities)):
+    for iter in range(len(g_entities)):
         indices = unravel_index(pair_score.argmax(), pair_score.shape())
         i, j = indices[0], indices[1]
 
@@ -57,7 +57,7 @@ def compare_entity(p_text, g_text):
 	return max(pair_score)
 
 
-def evaluation(p_steps, g_steps):
+def evaluate(p_steps, g_steps):
     true_positive = 0
     true_negative = 0
     false_positive = 0
