@@ -30,7 +30,7 @@ def compare_entities(p_entities, g_entities):
 
     for i, p_entity in enumerate(p_entity):
         for j, g_entity in enumerate(g_entity):
-            pair_score[i][j] = CompareEntity(p_entity.ent_text, g_entity.ent_text)
+            pair_score[i][j] = CompareEntity(p_entity.get_text(), g_entity.get_text())
 
     for iter in range(len(g_entities)):
         indices = unravel_index(pair_score.argmax(), pair_score.shape())
