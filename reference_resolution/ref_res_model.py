@@ -2,7 +2,10 @@ import spacy
 import neuralcoref
 
 from ling_obj_classes import *
- 
+
+#global variable for spacy model
+nlp = spacy.load('en_core_web_sm')
+
 #helper function for generators
 #returns first value of generator if exists, or None
 def get_first(generator):
@@ -14,8 +17,9 @@ def get_first(generator):
 
 
 class ReferenceResolver:
+
     def __init__(self):
-        self.nlp = spacy.load('en_core_web_sm')
+        self.nlp = nlp
 
         self.coref = neuralcoref.NeuralCoref(self.nlp.vocab, greedyness = 0.5)#, max_dist = 1000, max_dist_match = 1000)
         self.nlp.add_pipe(self.coref, name ='neuralcoref')
