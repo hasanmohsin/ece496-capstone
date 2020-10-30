@@ -41,4 +41,12 @@ step_text_eg_2 = ['Preheat the oven at 425 degree',
 
 action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg_2)
 
-evaluate(action_step_list, action_step_list)
+stats = evaluate(action_step_list, action_step_list)
+
+print("TP: {}".format(stats.true_positive))
+print("TN: {}".format(stats.true_negative))
+print("FN: {}".format(stats.false_negative))
+print("FP: {}".format(stats.false_positive))
+print("FP parse: {}".format(stats.false_positive_parse))
+print("FN parse: {}".format(stats.false_negative_parse))
+print("Pred mismatches: {}".format(stats.pred_mismatch))
