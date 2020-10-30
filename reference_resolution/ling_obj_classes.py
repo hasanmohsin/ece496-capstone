@@ -104,18 +104,25 @@ class Entity:
         self.act_id_ref = act_id_ref
         
         return
+
+    def get_text(self):
+        if type(self.ent_text) is str:
+            return self.ent_text
+        else
+            return self.ent_text.text
+
     #given an action step, sets the reference of this entity to that action step
     def set_reference(self, ref_act_id):
         self.act_id_ref = ref_act_id
         return
 
     def __eq__(self, other):
-        return (self.ent_text == other.ent_text) and (self.ent_type == other.ent_type) and (self.act_id_ref == other.act_id_ref)
+        return (self.get_text() == other.get_text()) and (self.ent_type == other.ent_type) and (self.act_id_ref == other.act_id_ref)
 
     def __hash__(self):
-        return hash(self.ent_text + self.ent_type + self.act_id_ref)
+        return hash(self.get_text() + self.ent_type + self.act_id_ref)
 
     def __str__(self):
-        return 'Type: {}, Entity Text: {}, Action ID: {}'.format(self.ent_type, self.ent_text, self.act_id_ref)
+        return 'Type: {}, Entity Text: {}, Action ID: {}'.format(self.ent_type, self.get_text(), self.act_id_ref)
 
     
