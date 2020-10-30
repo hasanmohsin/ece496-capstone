@@ -53,7 +53,7 @@ class ActionStep:
         return False
     
     def hasTokenEntity(self, token):
-        return (self.tokenInDOBJList() or self.tokenInPPList())
+        return (self.tokenInDOBJList(token) or self.tokenInPPList(token))
 
     #looks through PP and DOBJ list, and if the token is in them, 
     #sets the corresponding entities reference ID to passed ID
@@ -105,8 +105,8 @@ class Entity:
         
         return
     #given an action step, sets the reference of this entity to that action step
-    def set_reference(self, action_step):
-        self.act_id_ref = action_step.act_id
+    def set_reference(self, ref_act_id):
+        self.act_id_ref = ref_act_id
         return
 
     def __str__(self):

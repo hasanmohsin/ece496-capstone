@@ -17,7 +17,7 @@ class ReferenceResolver:
     def __init__(self):
         self.nlp = spacy.load('en_core_web_sm')
 
-        self.coref = neuralcoref.NeuralCoref(self.nlp.vocab, greedyness = 0.9, max_dist = 1000, max_dist_match = 1000)
+        self.coref = neuralcoref.NeuralCoref(self.nlp.vocab, greedyness = 0.5)#, max_dist = 1000, max_dist_match = 1000)
         self.nlp.add_pipe(self.coref, name ='neuralcoref')
         return
 
@@ -288,20 +288,19 @@ class ReferenceResolver:
            
         return action_step_list
 
-    #returns action ID the given token is in (as a pred, dobj or pp)
+    #returns list of action IDs the given token is in (as a pred, dobj or pp)
     #in most cases the token should be an entity (not a predicate)
-    #-1 if not found
+    #[-1] if not found
     def find_action_step_for_token(self, token, action_step_list):
+        action_ids = []
+
         for action_step in action_step_list:
-            #the token is a predicate for this action step
-            if action_step.pred == token.text:
-                return action_step.act_id
-
-
             if action_step.hasTokenEntity(token):
-                return action_step.act_id
-
-        return -1
+                action_ids.append(action_step.act_id)
+        if action_ids is None:
+            return [-1]
+        else:
+            return action_ids
 
     #given a list of strings, each corresponding to each step, produces 
     #a list of action_steps, ordered with action IDs
@@ -326,15 +325,18 @@ class ReferenceResolver:
     def resolve_refs_after_parse(self, step_text_list, action_step_list):
 
         #next do coreference resolution
-        sentence = ", then ".join(step_text_list)
+        sentence = ", ".join(step_text_list)
         
+        self.nlp.add_pipe(self.nlp.create_pipe('merge_noun_chunks'), name = 'merge_noun')
+
         #parses and finds coreferences
         doc = self.nlp(sentence)
 
         #go over each word
         for token in doc:
 
-            if token._.in_coref:
+            if token._.in_coref and (token.pos_ == "NOUN" or token.pos_ == "PROPN"):
+        
                 for cluster in token._.coref_clusters:
                     #the thing it refers to
                     main = cluster.main
@@ -343,21 +345,33 @@ class ReferenceResolver:
 
                     #find action step token is in, 
                     #find the action step main is in, and set the reference id
-                    token_action_id = self.find_action_step_for_token(token, action_step_list)
-                    ref_action_id = self.find_action_step_for_token(main, action_step_list)
+                    token_action_id_list = self.find_action_step_for_token(token, action_step_list)
+                    ref_action_id_list = self.find_action_step_for_token(main, action_step_list)
 
-                    #swap so we refer to a previous step
-                    if token_action_id < ref_action_id:
-                        tmp = token_action_id
-                        token_action_id = ref_action_id
-                        ref_action_id = tmp
+                    #intiialize to earliest point
+                    ref_action_id = min(ref_action_id_list)
 
-                    #looks at entities corresponding to this token for this action step, and inserts the
-                    #action ID they refer to for them
-                    if token_action_id != -1 and token_action_id != ref_action_id:
-                        action_step_list[token_action_id].set_references(token, ref_action_id)
+                    for token_action_id in token_action_id_list:
+                        #pick the most reference from ref_action_id_list that is earlier than token_action_id
+                        for ref_action_id_candidate in ref_action_id_list:
+                            if ref_action_id_candidate > ref_action_id and ref_action_id_candidate < token_action_id:
+                                ref_action_id = ref_action_id_candidate
+
+                        #swap so we refer to a previous step
+                        if token_action_id < ref_action_id:
+                            tmp = token_action_id
+                            token_action_id = ref_action_id
+                            ref_action_id = tmp
+
+                        #looks at entities corresponding to this token for this action step, and inserts the
+                        #action ID they refer to for them
+                        if token_action_id != -1 and token_action_id != ref_action_id:
+                            action_step_list[token_action_id].set_references(token, ref_action_id)
 
                     #ref_dict[token].append(main)
+        
+        self.nlp.remove_pipe('merge_noun')
+
         return action_step_list
 
     #main run method
@@ -457,11 +471,21 @@ step_text_eg_2 = ['Preheat the oven at 425 degree',
 'Place the avocado and lettuce topped bread slice on the bacon and tomato topped bread slice',
 'serve cutting the sandwich into 2 pieces']
 
+
+
+
 #print(step_text_eg_2)
 
 action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg_2)
+
 
 #assumes 1 action per step!
 rr_model.print_action_step_list(step_text_eg_2, action_step_list)
 
 #rr_model.write_action_step_list_file(action_step_list, './examples/action_step_list')
+
+#rr_model.print_action_step()
+
+#sentence = ", then ".join(step_text_eg_2)
+#doc = rr_model.nlp(sentence)
+#print(doc._.coref_clusters)
