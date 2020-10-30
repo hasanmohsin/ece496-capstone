@@ -17,7 +17,7 @@ class ReferenceResolver:
     def __init__(self):
         self.nlp = spacy.load('en_core_web_sm')
 
-        self.coref = neuralcoref.NeuralCoref(self.nlp.vocab)
+        self.coref = neuralcoref.NeuralCoref(self.nlp.vocab, greedyness = 0.9, max_dist = 1000, max_dist_match = 1000)
         self.nlp.add_pipe(self.coref, name ='neuralcoref')
         return
 
@@ -157,12 +157,49 @@ class ReferenceResolver:
 
         #given a sentence, finds action_entity breakdown
 
+    #parse the step, but assumed only 1 action step 
+    #for that step (eg. identifies only 1 predicate)
+    #returns a single action step
+    def parse_one_action_per_step(self, step_sent, step_num):
+        doc = self.nlp(step_sent)
+
+        action_step = None
+
+        for token in doc:
+            #get the root
+            if token.dep_ == "ROOT":
+                action = token
+
+                #related spen
+                action_span = doc[token.left_edge.i : token.right_edge.i+1]
+                action_step = ActionStep(pred = action.text, act_id= step_num)
+                
+                #we assign all pp and dobj in step to this action
+                for subtoken in action_span:
+                    if subtoken.pos_ == "ADP" or subtoken.dep_ == "dobj":
+                    
+                        #get substring corresponding to pp or dobj
+                        ent_span = doc[subtoken.left_edge.i : subtoken.right_edge.i+1]
+                        
+                        #if not already added
+                        if not action_step.hasTokenEntity(subtoken): 
+                            if subtoken.pos_ == "ADP":
+                                action_step.addPP(Entity(ent_span, "PP"))
+                            elif subtoken.dep_ == "dobj":
+                                action_step.addDOBJ(Entity(ent_span, "DOBJ"))
+                
+                #we only extract 1 sentence
+                break 
+        return action_step
+            
+
+    #same as above, but could have multiple actions per step
     #sentence should refer to a specific step
     #returns list of action step objects
     # each has a pred (PRED), list of direct objects (DOBJ) (Entities), and list of propositional phrases (PP) (entities) in dictionary
     #keys are the action word, value associated is the list of entities
     #related to that action
-    def parse_step(self, step_sent):
+    def parse_step_multiple_action_per_step(self, step_sent):
         #first find the entities
         doc = self.nlp(step_sent)
 
@@ -181,7 +218,7 @@ class ReferenceResolver:
                 action = token.head
 
                 #we stop at first verb up or until we get to root 
-                while action.pos_ != "VERB" and action.head != action:
+                while action.dep_ != "VERB" and action.head != action:
                     #print(action)
                     action = action.head
 
@@ -241,6 +278,16 @@ class ReferenceResolver:
 
         return ordered_action_step_list
 
+    #sets ids assuming action_step_list is in correct order
+    def order_ids_stepwise(self, action_step_list):
+        
+        count = 0
+        for action_step in action_step_list:
+           action_step.act_id = count
+           count+=1
+           
+        return action_step_list
+
     #returns action ID the given token is in (as a pred, dobj or pp)
     #in most cases the token should be an entity (not a predicate)
     #-1 if not found
@@ -262,14 +309,16 @@ class ReferenceResolver:
         action_step_list = []
 
         #parse each step individually to action_steps
-        for step in step_text_eg:
-            action_step_dict = self.parse_step(step)
-            action_step_list = action_step_list + list(action_step_dict.values())
+        count = 0
+        for step in step_text_list:
+            action_step = self.parse_one_action_per_step(step, count)
+            action_step_list = action_step_list + [action_step]
+            count +=1
 
         #now order them, going through the step list
         all_steps = " , ".join(step_text_list)
 
-        action_step_list = self.order_ids(all_steps, action_step_list)
+        #action_step_list = self.order_ids_stepwise(action_step_list)
 
         return action_step_list
 
@@ -287,25 +336,28 @@ class ReferenceResolver:
 
             if token._.in_coref:
                 for cluster in token._.coref_clusters:
-
+                    #the thing it refers to
                     main = cluster.main
-                    
-                    
+                
+                    #main the token this one refers to
 
-                    if token not in main:
-                        #main the token this one refers to
+                    #find action step token is in, 
+                    #find the action step main is in, and set the reference id
+                    token_action_id = self.find_action_step_for_token(token, action_step_list)
+                    ref_action_id = self.find_action_step_for_token(main, action_step_list)
 
-                        #find action step token is in, 
-                        #find the action step main is in, and set the reference id
-                        token_action_id = self.find_action_step_for_token(token, action_step_list)
-                        ref_action_id = self.find_action_step_for_token(main, action_step_list)
-                        
-                        #looks at entities corresponding to this token for this action step, and inserts the
-                        #action ID they refer to for them
-                        if token_action_id != -1 and token_action_id != ref_action_id:
-                            action_step_list[token_action_id].set_references(token, ref_action_id)
+                    #swap so we refer to a previous step
+                    if token_action_id < ref_action_id:
+                        tmp = token_action_id
+                        token_action_id = ref_action_id
+                        ref_action_id = tmp
 
-                        #ref_dict[token].append(main)
+                    #looks at entities corresponding to this token for this action step, and inserts the
+                    #action ID they refer to for them
+                    if token_action_id != -1 and token_action_id != ref_action_id:
+                        action_step_list[token_action_id].set_references(token, ref_action_id)
+
+                    #ref_dict[token].append(main)
         return action_step_list
 
     #main run method
@@ -321,9 +373,11 @@ class ReferenceResolver:
         
         return action_step_list
     
-    def print_action_step_list(self, action_step_list):
+    def print_action_step_list(self, step_list, action_step_list):
+        count = 0
         for action_step in action_step_list:
-            print("\nAction ID: {}".format(action_step.act_id))
+            print("\nStep Annotation: {}".format(step_list[count]))
+            print("Action ID: {}".format(action_step.act_id))
             print("PRED: {}".format(action_step.pred))
 
             dobj_list_str = [(dobj.ent_text.text + " (Refers to action ID: {})".format(dobj.act_id_ref)) for dobj in action_step.dobj_list]
@@ -331,6 +385,8 @@ class ReferenceResolver:
 
             print("DOBJ: {}".format(dobj_list_str))
             print("PP: {}".format(pp_list_str))
+
+            count+=1
         return
 
 rr_model = ReferenceResolver()
@@ -375,7 +431,37 @@ step_text_eg = ['pour into the ingredients',
  'pour in after mixing it',
  'decorate with fruit']
 
+step_text_eg_2 = ['Preheat the oven at 425 degree', 
+'drizzle little bit of olive oil on both the sides of 4 bread slices',
+'Lay the bacon slices on a broiler pan',
+'place both bread and bacon in the oven',
+'cook for 10-15 minutes',
+'cut the avocado into half',
+'take off the seed',
+'scoop the pulp of half into a bowl',
+'Squeeze half of a lemon juice',
+'add a pinch of salt and some fresh parsley',
+'mash them all together with a fork to get a paste',
+'Slice the other half of the avocado',
+' take out the bacon and bread toast from the oven',
+'To assemble bottom layer of sandwich',
+'take 2 slices of bread',
+'spread the avocado mixture over',
+'Place some tomato slices on the avocado spread and season with little salt and pepper',
+'season with little salt and pepper',
+'Drizzle a little bit of olive oil over it',
+'Top it with the bacon slices',
+'on the other slices of bread, place the sliced avocadoes',
+'Season avocado slices with little bit of salt',
+'top the avocadoes with lettuce leaves',
+'Place the avocado and lettuce topped bread slice on the bacon and tomato topped bread slice',
+'serve cutting the sandwich into 2 pieces']
 
-action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg)
+#print(step_text_eg_2)
 
-rr_model.print_action_step_list(action_step_list)
+action_step_list = rr_model.parse_and_resolve_all_refs(step_text_eg_2)
+
+#assumes 1 action per step!
+rr_model.print_action_step_list(step_text_eg_2, action_step_list)
+
+#rr_model.write_action_step_list_file(action_step_list, './examples/action_step_list')
