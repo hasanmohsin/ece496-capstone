@@ -1,6 +1,6 @@
 # ece496-capstone: Videos to Action Graphs
 
-Project for ECE496 capstone, University of Toronto.
+Videos to Action Graphs - Project for ECE496 capstone, University of Toronto.
 
 The project is about building a model which takes as input a video, with a time-aligned transcript, and outputs a visually grounded action graph (like a scene graph, but higher level, and with temporal relations). 
 
