@@ -108,7 +108,7 @@ class Entity:
     def get_text(self):
         if type(self.ent_text) is str:
             return self.ent_text
-        else
+        else:
             return self.ent_text.text
 
     #given an action step, sets the reference of this entity to that action step
