@@ -1,1 +1,15 @@
 neuralcoref/
+detectron/
+env/
+mmf/
+model_data/
+vqa-maskrcnn-benchmark/
+visualizer-output/
+
+__pycache__/
+.ipynb_checkpoints/
+graph/
+
+*.mp4
+*.vtt
+*.json

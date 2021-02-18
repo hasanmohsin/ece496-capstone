@@ -1,0 +1,144 @@
+config_version: 1.0
+training:
+  trainer: base_trainer
+  seed: 32688154
+  experiment_name: run
+  max_updates: 11000
+  max_epochs: null
+  log_interval: 100
+  logger_level: info
+  log_format: simple
+  log_detailed_config: false
+  should_not_log: false
+  tensorboard: false
+  batch_size: 480
+  num_workers: 4
+  fast_read: false
+  dataset_size_proportional_sampling: true
+  pin_memory: false
+  checkpoint_interval: 1000
+  evaluation_interval: 1000
+  clip_gradients: false
+  clip_norm_mode: all
+  early_stop:
+    enabled: false
+    patience: 4000
+    criteria: total_loss
+    minimize: true
+  lr_scheduler: true
+  lr_steps: []
+  lr_ratio: 0.1
+  use_warmup: false
+  warmup_factor: 0.2
+  warmup_iterations: 1000
+  device: cuda
+  local_rank: null
+  verbose_dump: false
+  find_unused_parameters: false
+  evaluate_metrics: false
+evaluation:
+  metrics: []
+  predict: false
+  predict_file_format: json
+model_config:
+  visual_bert:
+    bert_model_name: bert-base-uncased
+    training_head_type: pretraining
+    visual_embedding_dim: 2048
+    special_visual_initialize: true
+    embedding_strategy: plain
+    bypass_transformer: false
+    output_attentions: false
+    output_hidden_states: false
+    random_initialize: false
+    freeze_base: false
+    finetune_lr_multiplier: 1
+    model: visual_bert
+dataset_config:
+  masked_coco:
+    data_dir: ${resolve_dir:MMF_DATA_DIR, data}
+    depth_first: false
+    fast_read: false
+    use_images: false
+    use_features: true
+    features:
+      train:
+      - datasets/coco/features/lmdbs/coco_trainval2014.lmdb
+      - datasets/coco/features/lmdbs/coco_trainval2014.lmdb
+      val:
+      - datasets/coco/features/lmdbs/coco_trainval2014.lmdb
+      test:
+      - datasets/coco/features/lmdbs/coco_test2015.lmdb
+    annotations:
+      train:
+      - datasets/masked_coco/defaults/annotations/imdb_karpathy_train_by_image.npy
+      - datasets/masked_coco/defaults/annotations/imdb_karpathy_val_by_image.npy
+      val:
+      - datasets/masked_coco/defaults/annotations/imdb_karpathy_val_by_image.npy
+      test:
+      - datasets/masked_coco/defaults/annotations/imdb_karpathy_test_by_image.npy
+    max_features: 100
+    two_sentence: false
+    two_sentence_probability: 0.5
+    false_caption: false
+    false_caption_probability: 0.5
+    use_image_feature_masks: false
+    processors:
+      masked_token_processor:
+        type: masked_token
+        params:
+          tokenizer_config:
+            type: bert-base-uncased
+            params:
+              do_lower_case: true
+          mask_probability: 0.15
+          max_seq_length: 128
+    return_features_info: true
+    use_ocr: false
+    use_ocr_info: false
+datasets: masked_coco
+model: visual_bert
+config: projects/visual_bert/configs/masked_coco/pretrain_train_val.yaml
+run_type: train
+optimizer:
+  type: adam_w
+  params:
+    lr: 5.0e-05
+    eps: 1.0e-08
+scheduler:
+  type: warmup_linear
+  params:
+    num_warmup_steps: 1000
+    num_training_steps: 11000
+env:
+  cache_dir: ${resolve_cache_dir:MMF_CACHE_DIR}
+  data_dir: ${resolve_dir:MMF_DATA_DIR, data}
+  save_dir: ${env:MMF_SAVE_DIR, ./save}
+  dataset_zoo: configs/zoo/datasets.yaml
+  model_zoo: configs/zoo/models.yaml
+  log_dir: ''
+  report_dir: ''
+  tensorboard_logdir: ''
+  user_dir: ''
+distributed:
+  init_method: tcp://localhost:16320
+  rank: 0
+  port: -1
+  backend: nccl
+  world_size: 2
+  no_spawn: false
+checkpoint:
+  resume: false
+  resume_file: /checkpoint/asg/release_vl/visual_bert/pretraining/coco_train_val/visual_bert.visual_bert.bs896.s1.stwarmup_cosine.wu2000.st_ws88000.adam_w.lr5e-05.eps1e-08.mu88000.ngpu32/best.ckpt
+  resume_best: false
+  resume_pretrained: 'true'
+  resume_zoo: null
+  zoo_config_override: false
+  pretrained_state_mapping: {}
+  save_git_details: true
+  reset:
+    all: false
+    optimizer: false
+    counts: false
+start_rank: 0
+device_id: 0
