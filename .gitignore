@@ -4,7 +4,7 @@ env/
 mmf/
 model_data/
 vqa-maskrcnn-benchmark/
-visualizer-output/
+visualizer/visualizer-output/
 
 __pycache__/
 .ipynb_checkpoints/
@@ -13,3 +13,4 @@ graph/
 *.mp4
 *.vtt
 *.json
+!visualizer/sample_action_graph.json

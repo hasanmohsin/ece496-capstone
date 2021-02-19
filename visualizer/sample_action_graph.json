@@ -1,0 +1,93 @@
+[
+    {
+        "annot": "Preheat the oven at 425 degree",
+        "img": "sample_img.jpg",
+        "pred": "Preheat",
+        "entities": ["the oven", "at 425 degree"],
+        "bboxes": [
+        {
+            "left": 50,
+            "bot": 50,
+            "right": 100,
+            "top": 100
+        },
+        {
+            "left": 200,
+            "bot": 200,
+            "right": 400,
+            "top": 300
+        }
+        ],
+        "ea": [-1, -1],
+        "eb": [0, -1]
+    },
+
+    {
+        "annot": "drizzle little bit of olive oil on both the sides of 4 bread slices",
+        "img": "sample_img.jpg",
+        "pred": "drizzle",
+        "entities": ["little bit of olive oil", "on both the sides of 4 bread slices"],
+        "bboxes": [
+        {
+            "left": 50,
+            "bot": 50,
+            "right": 100,
+            "top": 100
+        },
+        {
+            "left": 200,
+            "bot": 200,
+            "right": 400,
+            "top": 300
+        }
+        ],
+        "ea": [-1, -1],
+        "eb": [0, 1]
+    },
+
+    {
+        "annot": "Lay the meat slices on a broiler pan",
+        "img": "sample_img.jpg",
+        "pred": "Lay",
+        "entities": ["the meat slices", "on a broiler pan"],
+        "bboxes": [
+        {
+            "left": 50,
+            "bot": 50,
+            "right": 100,
+            "top": 100
+        },
+        {
+            "left": 200,
+            "bot": 200,
+            "right": 400,
+            "top": 300
+        }
+        ],
+        "ea": [-1, -1],
+        "eb": [1, 0]
+    },
+
+    {
+        "annot": "place both bread and meat in the oven",
+        "img": "sample_img.jpg",
+        "pred": "place",
+        "entities": ["both bread", "and meat in the oven"],
+        "bboxes": [
+        {
+            "left": 50,
+            "bot": 50,
+            "right": 100,
+            "top": 100
+        },
+        {
+            "left": 200,
+            "bot": 200,
+            "right": 400,
+            "top": 300
+        }
+        ],
+        "ea": [1, 2],
+        "eb": [0, 1]
+    }
+]
