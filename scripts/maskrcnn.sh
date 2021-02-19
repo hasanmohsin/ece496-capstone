@@ -7,6 +7,7 @@ cd ./vqa-maskrcnn-benchmark
 python setup.py build
 python setup.py develop
 
+cd ..
 git clone https://github.com/NVIDIA/apex.git
 cd apex
 python setup.py install

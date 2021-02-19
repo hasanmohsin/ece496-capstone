@@ -4,7 +4,10 @@ env/
 mmf/
 model_data/
 vqa-maskrcnn-benchmark/
+apex/
+
 visualizer/visualizer-output/
+visualizer-output/
 
 __pycache__/
 .ipynb_checkpoints/
