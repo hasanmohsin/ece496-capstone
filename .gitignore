@@ -13,7 +13,9 @@ __pycache__/
 .ipynb_checkpoints/
 graph/
 
+*.swp
 *.mp4
+*.png
 *.vtt
 *.json
 !visualizer/sample_action_graph.json
