@@ -67,7 +67,7 @@ def loss_RA_MIL(y, R, E, V):
     # Compute reference based penalty. 1 if none of the entities in e_m refer
     # to a_l, constant (hyperparameter) otherwise. We can use R since it has
     # the mappings between each of the actions. This is a M x M matrix.
-    Y_lm = R * y
+    Y_lm = torch.clip(R + y, 0, 1)
     Y_ml = Y_lm.transpose(0, 1)
 
     # Zero matrix.
