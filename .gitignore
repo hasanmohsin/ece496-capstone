@@ -19,3 +19,4 @@ graph/
 *.vtt
 *.json
 !visualizer/sample_action_graph.json
+!datasets/annotations/*.json

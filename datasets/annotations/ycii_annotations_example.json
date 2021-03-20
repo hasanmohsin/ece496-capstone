@@ -1,0 +1,33 @@
+{
+	"database": {
+
+		"GLd3aX16zBg": {
+			"duration": 241.62, 
+			"subset": "training", 
+			"recipe_type": "113", 
+			"annotations": [
+			{"segment": [90, 102], "id": 0, "sentence": "spread margarine on two slices of white bread"}, 
+			{"segment": [114, 127], "id": 1, "sentence": "place a slice of cheese on the bread"}, 
+			{"segment": [132, 138], "id": 2, "sentence": "place the bread slices on top of each other and place in a hot pan"}, 
+			{"segment": [139, 145], "id": 3, "sentence": "flip the sandwich over and press down"}, 
+			{"segment": [173, 174], "id": 4, "sentence": "cut the sandwich in half diagonally"}], 
+			"video_url": "https://www.youtube.com/watch?v=GLd3aX16zBg"
+		},
+
+		"xHr8X2Wpmno": {
+			"duration": 206.86, 
+			"subset": "validation", 
+			"recipe_type": "226", 
+			"annotations": [
+				{"segment": [47, 60], "id": 0, "sentence": "pick the ends off the verdalago"}, 
+				{"segment": [67, 89], "id": 1, "sentence": "combine lemon juice sumac garlic salt and oil in a bowl"}, 
+				{"segment": [91, 98], "id": 2, "sentence": "chop lettuce and place it in a bowl"}, 
+				{"segment": [99, 137], "id": 3, "sentence": "add verdalago pepper cucumbers tomatoes herbs and onions to the lettuce in the bowl"}, 
+				{"segment": [153, 162], "id": 4, "sentence": "pour the dressing over the salad and mix"}, 
+				{"segment": [163, 185], "id": 5, "sentence": "add the fried pita to the salad and mix"}
+			], 
+			"video_url": "https://www.youtube.com/watch?v=xHr8X2Wpmno"
+		}
+	}
+}
+
