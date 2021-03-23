@@ -1,0 +1,23 @@
+Format of JSON yc2_bb_x annotation files
+
+-> database (dict)
+ -> [video name]: identifier of video (dict)
+  - rwidth: resized width of video, will be 720px (int)
+  - rheight: resized height of video, maintains aspect ratio (int)
+  - recipe_type: recipe id of video (string)
+  - duration: duration of entire video in seconds (int)
+   -> segments (dict)
+    ->[segment number]: segment from video with bounding box annotations (dict)
+    - segment: (time start, time end) in seconds of video segment
+     -> objects (list)
+      ->[object number]: Annotated object from segment (dict)
+       - label: object label name (string)
+       -> boxes (list) 
+        ->[frame number]: Annotated frame from segment (dict)
+         - occluded: 0 if object is not occluded, 1 if object is occluded (int)
+	 - ybr: y coordinate of bottom right corner of bounding box (int)
+	 - ytl: y coordinate of top left corner of bounding box (int)
+	 - xbr: x coordinate of bottom right corner of bounding box (int)
+ 	 - outside: 1 if object is outside of the frame, 0 else (int)
+	 - xtl: x coordinate of top left corner of bounding box (int)
+			

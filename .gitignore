@@ -20,3 +20,4 @@ graph/
 *.json
 !visualizer/sample_action_graph.json
 !datasets/annotations/*.json
+!datasets/yc2_bb/annotations/*.json
