@@ -71,7 +71,7 @@ def loss_RA_MIL(y, R, E, V):
     Y_ml = Y_lm.transpose(1, 2)
 
     # Zero matrix.
-    zero = torch.zeros(B, M, M, dtype=torch.float)
+    zero = torch.zeros(B, M, M, dtype=torch.float).cuda()
 
     # S_ll needs to have the rows filled with diagonal values. Note that unsqueeze(1)
     # for a vector is the same as transposing it.
