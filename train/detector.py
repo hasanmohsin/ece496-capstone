@@ -5,6 +5,7 @@ import PIL.Image
 import utils
 import io
 import numpy as np
+import torch
 
 from IPython.display import clear_output, Image, display
 from processing_image import Preprocess
@@ -13,10 +14,14 @@ from modeling_frcnn import GeneralizedRCNN
 from utils import Config
 
 class Detector():
-    def __init__(self):
+    def __init__(self, device):
+        self.device = device
+
         config = Config.from_pretrained("unc-nlp/frcnn-vg-finetuned")
-        
+        if torch.cuda.is_available():
+            config.model.device = "cuda"
         self.frcnn = GeneralizedRCNN.from_pretrained("unc-nlp/frcnn-vg-finetuned", config=config)
+
         self.image_preprocess = Preprocess(config)
         
     def inference(self, URL, max_detections=1, visualize=False):
@@ -28,7 +33,8 @@ class Detector():
             scales_yx=scales_yx, 
             padding="max_detections",
             max_detections=max_detections,
-            return_tensors="pt"
+            return_tensors="pt",
+            location=self.device
         )
 
         normalized_boxes = output.get("normalized_boxes")
