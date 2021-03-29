@@ -4,7 +4,14 @@ import neuralcoref
 nlp = spacy.load('en_core_web_sm')
 
 def parse(steps, max_step_length=None):
-    entities = [list(get_entities(step).values())[0] for step in steps]
+    entities = []
+    for step in steps:
+        ents = list(get_entities(step).values())
+        if len(ents) == 0:
+            entities.append([])
+        else:
+            entities.append(ents[0])
+    #entities = [list(get_entities(step).values())[0] for step in steps]
     indices = []
 
     for idx, data in enumerate(zip(entities, steps)):
@@ -12,14 +19,17 @@ def parse(steps, max_step_length=None):
         step = data[1]
         start = 0
 
-        for e in es:
-            if max_step_length:
-                shift = idx * max_step_length
-            else:
-                shift = 0
+        if len(es) == 0:
+            indices.append([])
+        else:
+            for e in es:
+                if max_step_length:
+                    shift = idx * max_step_length
+                else:
+                    shift = 0
 
-            mapping_entity, start = get_index(step, e, start, shift)
-            indices.append(mapping_entity)
+                mapping_entity, start = get_index(step, e, start, shift)
+                indices.append(mapping_entity)
 
     return entities, indices
 
@@ -27,6 +37,7 @@ def get_index(sentence, entity, start=0, shift=0):
     mapping = []
     words_sentence = sentence.split()
     words_entity = entity.split()
+    words_count = len(words_entity)
 
     e = words_entity.pop(0)
 
@@ -35,6 +46,9 @@ def get_index(sentence, entity, start=0, shift=0):
             mapping.append(idx + start + shift)
             if len(words_entity) > 0:
                 e = words_entity.pop(0)
+
+        if len(mapping) == words_count:
+            break
 
     return mapping, (mapping[-1] + 1 - shift)
 
