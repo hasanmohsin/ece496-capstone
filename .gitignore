@@ -21,3 +21,6 @@ graph/
 !visualizer/sample_action_graph.json
 !datasets/annotations/*.json
 !datasets/yc2_bb/annotations/*.json
+!datasets/fi_datasets/subsets.json
+!datasets/fi_datasets/YCII/VG/gnding_annot_all.json
+!datasets/fi_datasets/YCII/RR/*/*.vtt
