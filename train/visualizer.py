@@ -78,7 +78,7 @@ def inference(model, num_actions, index):
 
             # RR processing.
             rr_idx = int(RR[a_idx][e_idx])
-            print("{} -> Action {} ({})".format(entity, rr_idx, actions[rr_idx]))
+            print("{} -> Action {} ({})".format(entity, rr_idx + 1, actions[rr_idx]))
         
         plt.show()
 
