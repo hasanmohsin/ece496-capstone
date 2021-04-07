@@ -86,10 +86,12 @@ def model_inference(model, num_actions, steps, entity_count, bboxes, features):
     model.eval()
     
     steps = [steps]
-    entitiy_count = [entity_count]
+    entity_count = [entity_count]
+    entities = [entities]
+    
     bboxes = bboxes.unsqueeze(0)
     features = features.unsqueeze(0)
 
     with torch.no_grad():
-        _, _, _, VG, RR, _, _, _ = model(1, num_actions + 1, steps, features, bboxes, entity_count)
+        _, _, _, VG, RR, _, _, _ = model(1, num_actions + 1, steps, features, bboxes, entity_count, entities)
         return VG.squeeze(0), RR.squeeze(0)
