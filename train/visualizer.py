@@ -72,13 +72,13 @@ def inference(model, num_actions, index):
             bbox_width = x1 - x0
             bbox_height = y1 - y0
 
-            box = Rectangle((x0, y0), bbox_width, bbox_height, linewidth=1, edgecolor='r', facecolor='none')
+            box = Rectangle((x0, y0), bbox_width, bbox_height, linewidth=1, edgecolor='lime', facecolor='none')
             axes.add_patch(box)
-            axes.annotate(entity, (x0 + (bbox_width / 2), y0 + (bbox_height / 2)), color='white', fontsize=10, ha='center', va='center')
+            axes.annotate(entity, (x0 + (bbox_width / 2), y0 + (bbox_height / 2)), color='white', fontsize=18, ha='center', va='center')
 
             # RR processing.
             rr_idx = int(RR[a_idx][e_idx])
-            print("{} -> Action {} ({})".format(entity, rr_idx + 1, actions[rr_idx]))
+            print("\u001b[38;5;82m {} \u001b[38;5;208m -> Action {} ({}) \u001b[0m".format(entity, rr_idx + 1, actions[rr_idx]))
         
         plt.show()
 
