@@ -1,6 +1,7 @@
 import torch
+import torch.nn.functional as F
 
-def loss_RA_MIL(y, R, E, V):
+def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
     '''
     Custom loss function for reference-aware visual grounding. This function must
     use PyTorch functions for any parameters that are to be trained. Some of the
@@ -67,7 +68,7 @@ def loss_RA_MIL(y, R, E, V):
     # Compute reference based penalty. 1 if none of the entities in e_m refer
     # to a_l, constant (hyperparameter) otherwise. We can use R since it has
     # the mappings between each of the actions. This is a M x M matrix.
-    Y_lm = torch.clamp(R + y, 0.0, 1.0)
+    Y_lm = torch.clamp(R[:,:,:-1] + y, 0.0, 1.0)
     Y_ml = Y_lm.transpose(1, 2)
 
     # Zero matrix.
@@ -78,6 +79,17 @@ def loss_RA_MIL(y, R, E, V):
     S_ll = S_lm.diagonal(dim1=1, dim2=2).unsqueeze(2).repeat(1, 1, M)
     
     # Vectorization magic.
-    loss = (Y_lm * torch.max(zero, S_lm - S_ll) + Y_ml * torch.max(zero, S_ml - S_ll)).sum()
+    loss_alignment = (Y_lm * torch.max(zero, S_lm - S_ll) + Y_ml * torch.max(zero, S_ml - S_ll)).sum()
     
+    # Include KL divergence.
+    target = B * 250
+    loss_KL_div = F.kl_div(VG_dist1, VG_dist2, log_target=True, reduction='sum')
+    loss_KL_div_eff = target - torch.clamp(loss_KL_div, max=target)
+
+    print("(Alignment Loss: {}, KL_Div Loss: {}".format(loss_alignment, loss_KL_div))
+
+    loss = loss_alignment + loss_KL_div_eff
+
     return loss
+
+    #return loss_alignment
