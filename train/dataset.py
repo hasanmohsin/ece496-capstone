@@ -8,7 +8,6 @@ import pickle
 DETECTION_EMBEDDING_SIZE = 2048
 BOUNDING_BOX_SIZE = 4
 NUM_FRAMES_PER_STEP = 5
-MAX_DETECTIONS = 20
 
 def depickle_data(pickles_dir, fname):
     pickle_path = os.path.join(pickles_dir, fname + '.pickle')
@@ -44,36 +43,40 @@ class YouCookII(Dataset):
         
         return video_id, bboxes, features, actions, steps, entities, entity_count, indices, max_step_length
     
-def collate_fn(datapoints):
-    video_id_list = []
+class YouCookIICollate():
+    def __init__(self, MAX_DETECTIONS=20):
+        self.MAX_DETECTIONS = MAX_DETECTIONS
+
+    def __call__(self, datapoints):
+        video_id_list = []
     
-    bboxes_tensor = None
-    features_tensor = None
-    
-    steps_list = []
-    entities_list = []
-    entity_count_list = []
-    
-    indices_list = []
-    max_step_length_list = []
+        bboxes_tensor = None
+        features_tensor = None
         
-    for i, data in enumerate(datapoints):
-        video_id, bboxes, features, actions, steps, entities, entity_count, indices, max_step_length = data
+        steps_list = []
+        entities_list = []
+        entity_count_list = []
         
-        if i == 0:
-            bboxes_tensor = torch.ones((len(datapoints), len(actions) * NUM_FRAMES_PER_STEP * MAX_DETECTIONS, BOUNDING_BOX_SIZE))
-            features_tensor = torch.ones((len(datapoints), len(actions) * NUM_FRAMES_PER_STEP * MAX_DETECTIONS, DETECTION_EMBEDDING_SIZE))
-        
-        bboxes_tensor[i] = bboxes
-        features_tensor[i] = features
-        
-        video_id_list.append(video_id)        
-        
-        steps_list.append(steps)
-        entities_list.append(entities)
-        entity_count_list.append(entity_count)
-        
-        indices_list.append(indices)
-        max_step_length_list.append(max_step_length)
-        
-    return video_id_list, bboxes_tensor, features_tensor, steps_list, entities_list, entity_count_list, indices_list, max_step_length_list
+        indices_list = []
+        max_step_length_list = []
+            
+        for i, data in enumerate(datapoints):
+            video_id, bboxes, features, actions, steps, entities, entity_count, indices, max_step_length = data
+            
+            if i == 0:
+                bboxes_tensor = torch.ones((len(datapoints), len(actions) * NUM_FRAMES_PER_STEP * self.MAX_DETECTIONS, BOUNDING_BOX_SIZE))
+                features_tensor = torch.ones((len(datapoints), len(actions) * NUM_FRAMES_PER_STEP * self.MAX_DETECTIONS, DETECTION_EMBEDDING_SIZE))
+            
+            bboxes_tensor[i] = bboxes
+            features_tensor[i] = features
+            
+            video_id_list.append(video_id)        
+            
+            steps_list.append(steps)
+            entities_list.append(entities)
+            entity_count_list.append(entity_count)
+            
+            indices_list.append(indices)
+            max_step_length_list.append(max_step_length)
+            
+        return video_id_list, bboxes_tensor, features_tensor, steps_list, entities_list, entity_count_list, indices_list, max_step_length_list

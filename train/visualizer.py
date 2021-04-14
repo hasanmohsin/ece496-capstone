@@ -14,8 +14,8 @@ BOUNDING_BOX_SIZE = 4
 
 NULL = '[unused1]'
 
-def inference(model, num_actions, index):
-    root = "/h/sagar/ece496-capstone/datasets/ycii/{}/{}".format(num_actions, str(index).zfill(5))
+def inference(model, num_actions, index, root):
+    root = "{}/{}/{}".format(root, num_actions, str(index).zfill(5))
 
     pickle_root = "{}/pickles".format(root)
     frames_root = "{}/frames".format(root)
