@@ -8,13 +8,12 @@ import cv2
 import matplotlib.pyplot as plt
 
 NUM_FRAMES_PER_STEP = 5
-NUM_CANDIDATES_PER_FRAME = 20
 DETECTION_EMBEDDING_SIZE = 2048
 BOUNDING_BOX_SIZE = 4
 
 NULL = '[unused1]'
 
-def inference(model, num_actions, index, root):
+def inference(model, num_actions, index, root, NUM_CANDIDATES_PER_FRAME = 20):
     root = "{}/{}/{}".format(root, num_actions, str(index).zfill(5))
 
     pickle_root = "{}/pickles".format(root)
