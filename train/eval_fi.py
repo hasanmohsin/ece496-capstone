@@ -286,16 +286,20 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
     return VG, RR, mean_iou
 
 
-def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
+def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0.5):
     """
-    Return the mean IoUs for model output, random, and best candidates for all entities in a single video
+    Return the mean IoUs and accuracy for model output, random, and best candidates
     model: model for inferencing
     num_actions: number of actions in video
     index: video index in dataset directory
     root: directory path to dataset base
-    Returns mean_ours_iou: mean IoU of model output bboxes and ground truth bboxes
-    Returns mean_rand_iou: mean IoU of randomly selected bboxes and ground truth bboxes
+    acc_thresh: IoU threshold for accuracy
     Returns mean_best_iou: upper bound mean IoU of candidate bboxes and ground truth bboxes
+    Returns mean_rand_iou: mean IoU of randomly selected bboxes and ground truth bboxes
+    Returns mean_ours_iou: mean IoU of model output bboxes and ground truth bboxes
+    Returns best_acc: Top-1 accuracy for proposal upper bound
+    Returns rand_acc: Top-1 accuracy for random selection
+    Returns ours_acc: Top-1 accuracy for model output
     """
     
     # Load data from disk
@@ -325,6 +329,10 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
     mean_best_iou = 0.0
     mean_rand_iou = 0.0
     mean_ours_iou = 0.0
+    
+    best_correct = 0 # number of correctly matched bboxes (based on given threshold)
+    rand_correct = 0
+    ours_correct = 0
     
     num_ents = 0
     
@@ -397,18 +405,24 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
             # Calculate model output IoU
             ours_iou = compute_iou_from_normalized_coords(bbox, frame_width, frame_height, gt_bbox)
             print('Chosen Frame IoU: {}'.format(ours_iou))
-            
+            if ours_iou >= acc_thresh:
+                ours_correct += 1
+
             # Calculate best IoU possible from all candidates for current action
             best_iou = 0.0
             for candidate_bbox in frame_candidate_bboxes:
                 candidate_iou = compute_iou_from_normalized_coords(candidate_bbox, frame_width, frame_height, gt_bbox)
                 best_iou = max(best_iou, candidate_iou)
             print('Best IoU possible = {}'.format(best_iou))
-            
+            if best_iou >= acc_thresh:
+                best_correct += 1
+
             # Pick a random candidate from all candidates for current action
             rand_bbox = frame_candidate_bboxes[random.randint(0,NUM_CANDIDATES_PER_STEP-1)]
             rand_iou = compute_iou_from_normalized_coords(rand_bbox, frame_width, frame_height, gt_bbox)
             print('Random Candidate IoU = {}'.format(rand_iou))
+            if rand_iou >= acc_thresh:
+                rand_correct += 1
 
             mean_rand_iou += rand_iou
             mean_best_iou += best_iou
@@ -420,11 +434,16 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
     mean_ours_iou /= num_ents
     mean_rand_iou /= num_ents
     
-    print('Mean Upper Bound IoU: {}, Mean Random IoU: {}, Mean Model Output IoU: {}'.format(mean_best_iou, 
-                                                                                            mean_rand_iou, 
-                                                                                            mean_ours_iou))
+    print('Mean Upper Bound IoU: {}, Mean Random IoU: {}, Mean Model IoU: {}'.format(mean_best_iou, 
+                                                                                     mean_rand_iou, 
+                                                                                     mean_ours_iou))
     
-    return mean_best_iou, mean_rand_iou, mean_ours_iou
+    best_acc = best_correct / num_ents
+    rand_acc = rand_correct / num_ents
+    ours_acc = ours_correct / num_ents
+    print('Top-1 acc@{}:\nProposal Upper Bound: {}, Random: {}, Model: {}'.format(acc_thresh, best_acc, rand_acc, ours_acc))
+    
+    return mean_best_iou, mean_rand_iou, mean_ours_iou, best_acc, rand_acc, ours_acc
 
 
 def eval_all_dataset(model, acc_thresh=0.5):
@@ -441,6 +460,10 @@ def eval_all_dataset(model, acc_thresh=0.5):
     all_vid_mean_best_iou = 0.0
     all_vid_mean_rand_iou = 0.0
     all_vid_mean_ours_iou = 0.0 # ours: model-chosen output
+    
+    all_vid_best_acc = 0.0
+    all_vid_rand_acc = 0.0
+    all_vid_ours_acc = 0.0
 
     vid_count = 0
 
@@ -450,11 +473,7 @@ def eval_all_dataset(model, acc_thresh=0.5):
         indices = len(os.listdir(os.path.join(FI, str(num_actions))))
 
         for idx in range(indices):
-            mean_best_iou_vid, mean_rand_iou_vid, mean_ours_iou_vid = compute_eval_ious(model, 
-                                                                                        num_actions=num_actions, 
-                                                                                        index=idx, 
-                                                                                        root=FI, 
-                                                                                        gt_bbox_all=None)
+            mean_best_iou_vid, mean_rand_iou_vid, mean_ours_iou_vid, best_acc, rand_acc, ours_acc = compute_eval_ious(model, num_actions=num_actions, index=idx, root=FI, gt_bbox_all=None, acc_thresh=acc_thresh)
 
             mean_best_ious.append(mean_best_iou_vid)
             mean_rand_ious.append(mean_rand_iou_vid)
@@ -463,24 +482,34 @@ def eval_all_dataset(model, acc_thresh=0.5):
             all_vid_mean_best_iou += mean_best_iou_vid
             all_vid_mean_rand_iou += mean_rand_iou_vid
             all_vid_mean_ours_iou += mean_ours_iou_vid
-
+            
+            all_vid_best_acc += best_acc
+            all_vid_rand_acc += rand_acc
+            all_vid_ours_acc += ours_acc
+            
             vid_count += 1
 
     all_vid_mean_best_iou /= vid_count
     all_vid_mean_rand_iou /= vid_count
     all_vid_mean_ours_iou /= vid_count
+
+    all_vid_best_acc /= vid_count
+    all_vid_rand_acc /= vid_count
+    all_vid_ours_acc /= vid_count
     
     print('--------------------------------------------------')
-    print('All videos evaluation summary:')
+    print('EVALUATION SUMMARY')
     print('Number of videos: {}'.format(vid_count))
-    print('Mean Upper Bound IoU: {}'.format(all_vid_mean_best_iou))
-    print('Mean Random IoU: {}'.format(all_vid_mean_rand_iou))
-    print('Mean Model Output IoU: {}'.format(all_vid_mean_ours_iou))
+    print('Mean IoU:')
+    print('\tProposal Upper Bound: {}'.format(all_vid_mean_best_iou))
+    print('\tRandom: {}'.format(all_vid_mean_rand_iou))
+    print('\tModel: {}'.format(all_vid_mean_ours_iou))
     
-    # TODO: Top-1 accuracy@0.5
-#     print('Proposal Upper Bound: '.format(all_vid_mean_best_acc))
-#     print('Random: '.format(all_vid_mean_rand_acc))
-#     print('Model: '.format(all_vid_mean_ours_acc))
+    print('Top-1 accuracy@{}:'.format(acc_thresh))
+    print('\tProposal Upper Bound: {:.1f}%'.format(all_vid_best_acc*100))
+    print('\tRandom: {:.1f}%'.format(all_vid_rand_acc*100))
+    print('\tModel: {:.1f}%'.format(all_vid_ours_acc*100))
+    print('--------------------------------------------------')
     
     return
 
