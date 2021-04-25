@@ -1,25 +1,27 @@
+import cv2
+import json
+import math
+import matplotlib.pyplot as plt
+import os
 import random
+import torch
+
 from dataset import depickle_data
 from matplotlib.patches import Rectangle
-
-import torch
-import os
-import math
-import cv2
-import matplotlib.pyplot as plt
-import json
-
 from visualizer import *
 
+
 ## NOTE: only tested with 5 detections per frame, 5 frames per step
-NUM_FRAMES_PER_STEP = 5
 NUM_CANDIDATES_PER_FRAME = 5
-DETECTION_EMBEDDING_SIZE = 2048
-BOUNDING_BOX_SIZE = 4
+NUM_FRAMES_PER_STEP = 5
+NUM_CANDIDATES_PER_STEP = NUM_CANDIDATES_PER_FRAME * NUM_FRAMES_PER_STEP
+DETECTION_EMBEDDING_DIM = 2048
+BOUNDING_BOX_DIM = 4
 
 NULL = '[unused1]'
 
-FI = "/h/sagar/ece496-capstone/datasets/fi"
+FI = '/h/sagar/ece496-capstone/datasets/fi'
+FI_VG = '/h/sagar/ece496-capstone/datasets/fi_datasets/YCII/VG/gnding_annot_all.json'
 
 def read_json(path='output.json'):
     """
@@ -39,9 +41,10 @@ def read_json(path='output.json'):
 ############### HELPER FUNCTIONS ###################
 def compute_iou(bbox_a, bbox_b):
     """
-    Computes the IoU of bbox_a and bbox_b
+    Return the IoU of bbox_a and bbox_b
     bbox_a: list of 4 positive integers representing x, y, width, height
     bbox_b: list of 4 positive integers representing x, y, width, height
+    Returns iou: the IoU of bbox_a and bbox_b
     """
 
     a_x1 = bbox_a[0]            # x
@@ -72,6 +75,27 @@ def compute_iou(bbox_a, bbox_b):
     iou = int_area/float(union_area)
 
     return iou
+
+
+def compute_iou_from_normalized_coords(bbox_normalized, img_width, img_height, bbox_b):
+    """
+    Return the IoU of bbox_normalized and bbox_b
+    bbox_normalized: list of 4 positive integers representing normalized coordinates x1, y1, x2, y2
+    img_width: width of image associated with bbox_normalized
+    img_height: height of image associated with bbox_normalized
+    bbox_b: list of 4 positive integers representing x, y, width, height
+    Returns iou: the IoU of bbox_normalized and bbox_b
+    """
+    x1, y1 = bbox_normalized[0] * img_width, bbox_normalized[1] * img_height
+    x2, y2 = bbox_normalized[2] * img_width, bbox_normalized[3] * img_height
+
+    bbox_width = x2 - x1
+    bbox_height = y2 - y1
+
+    bbox = [x1, y1, bbox_width, bbox_height]
+
+    return compute_iou(bbox, bbox_b)
+
 
 #given a list of vg keys, and a frame name the model grounded to, find the closest frame
 #in time to that
@@ -132,47 +156,46 @@ def get_vg_key(action_id, match_ent_id, gt_vid_bbox):
 
 ############# EVALUATE, WITH VISUALIZATION############################
 
+# TODO: this function is largely a duplication of the previous version of compute_eval_ious function. Need to refactor code.
 #evaluates Mean IoU of model, and draws gt bboxes + model bboxes
 #example run: VG, RR, mean_iou_pretrained = eval_im(model, num_actions=10, index=2, root=FI, gt_bbox_all=None)
 def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
     
-    root = "{}/{}/{}".format(root, num_actions, str(index).zfill(5))
+    root = os.path.join(root, str(num_actions), str(index).zfill(5))
+    pickles_root = os.path.join(root, 'pickles')
+    frames_root = os.path.join(root, 'frames')
 
-    pickle_root = "{}/pickles".format(root)
-    frames_root = "{}/frames".format(root)
-
-    frame_paths = depickle_data(pickle_root, 'frame_paths')
-    entities = depickle_data(pickle_root, 'entities')
-    actions = depickle_data(pickle_root, 'actions_list')
-    actions.append("[NULL]")
-    candidates = depickle_data(pickle_root, 'candidates')
-    vid_id = depickle_data(pickle_root, 'vid_id')
-    
-    steps = depickle_data(pickle_root, 'steps')
-    entity_count = depickle_data(pickle_root, 'entity_count')
-    bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_SIZE)
-    features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_SIZE)
+    frame_paths = depickle_data(pickles_root, 'frame_paths')
+    entities = depickle_data(pickles_root, 'entities')
+    actions = depickle_data(pickles_root, 'actions_list')
+    actions.append('[NULL]')
+    candidates = depickle_data(pickles_root, 'candidates')
+    vid_id = depickle_data(pickles_root, 'vid_id')
+    steps = depickle_data(pickles_root, 'steps')
+    entity_count = depickle_data(pickles_root, 'entity_count')
+    bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_DIM)
+    features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_DIM)
     
     if gt_bbox_all is None:
-        gt_bbox_all = read_json("/h/sagar/ece496-capstone/datasets/fi_datasets/YCII/VG/gnding_annot_all.json")
+        gt_bbox_all = read_json(FI_VG)
     
     gt_vid_bbox = gt_bbox_all[vid_id]
     
     VG, RR = model_inference(model, num_actions, steps, entities, entity_count, bboxes, features)
     
-    #calculate mean groundin IoU
+    # calculate mean grounding IoU
     #1) if gt doesn't have bbox, we skip (doesn't count towards IoU) - since model must ground all entities
     #2) we look for gt bbox in nearest frame to model grounded one
     # this may lead to addition leniency in IoU score
     mean_iou = 0.0
     num_ents = 0
     
-    for a_idx, action in enumerate(entities[:-1]):        
-        print("Action {}: {}".format(a_idx + 1, actions[a_idx]))
-        print("-------------------------------")
+    for action_idx, action_entities in enumerate(entities[:-1]):    
+        print('--------------------------------------------------')
+        print('Action {}: {}'.format(action_idx + 1, actions[action_idx]))
 
-        if len(action) == 0:
-            print("No entities detected for this action.")
+        if len(action_entities) == 0:
+            print('No entities detected for this action.')
 
         frame_path = None
         prev_frame_path = None
@@ -180,10 +203,10 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
         fig = None
         axes = None
 
-        for e_idx, entity in enumerate(action):
+        for ent_idx, entity in enumerate(action_entities):
             # VG processing.
-            offset = NUM_FRAMES_PER_STEP * a_idx
-            candidate = int(VG[a_idx][e_idx])
+            offset = NUM_FRAMES_PER_STEP * action_idx
+            candidate = int(VG[action_idx][ent_idx])
             vg_idx = offset + math.floor(candidate / NUM_CANDIDATES_PER_FRAME)
 
             prev_frame_path = frame_path
@@ -193,8 +216,8 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
             ################################################
             ## processing for ground truth entity bbox
             #index into gt as (action_idx, entity_idx, instance of entity)
-            #str_action_id =  '('+str(a_idx)+', '+str(e_idx) + ', ' + str(0) + ')'
-            vg_keys = get_vg_key(a_idx, e_idx, gt_vid_bbox)
+            #str_action_id =  '('+str(action_idx)+', '+str(ent_idx) + ', ' + str(0) + ')'
+            vg_keys = get_vg_key(action_idx, ent_idx, gt_vid_bbox)
             
             print(vg_keys)
             
@@ -204,7 +227,7 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
                                      gt_vid_bbox=gt_vid_bbox)
             
             if gt_bbox is None:
-                print("This entity has no ground truth bounding box")
+                print('This entity has no ground truth bounding box')
                 continue
             
             #gt_bbox_list, gt_frame
@@ -221,7 +244,7 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
             gt_x0 = gt_bbox_list[0]
             gt_y0 = gt_bbox_list[1]
             
-            #print("GT frame is {}, model frame is {}".format(gt_frame, frame_path))
+            #print('GT frame is {}, model frame is {}'.format(gt_frame, frame_path))
             
             frame = cv2.imread(frame_path)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -244,7 +267,7 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
             box = Rectangle((x0, y0), bbox_width, bbox_height, linewidth=1, edgecolor='lime', facecolor='none')
             
             iou = compute_iou(vg_box, gt_bbox_list)
-            print("IoU is: {}".format(iou))
+            print('IoU is: {}'.format(iou))
             
             mean_iou += iou
             num_ents +=1
@@ -254,8 +277,8 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
             axes.annotate(entity, (gt_x0 + (gt_bbox_width / 2), gt_y0 + (gt_bbox_height / 2)), color='white', fontsize=18, ha='center', va='center')
 
             # RR processing.
-            rr_idx = int(RR[a_idx][e_idx])
-            print("\u001b[38;5;82m {} \u001b[38;5;208m -> Action {} ({}) \u001b[0m".format(entity, rr_idx + 1, actions[rr_idx]))
+            rr_idx = int(RR[action_idx][ent_idx])
+            print('\u001b[38;5;82m {} \u001b[38;5;208m -> Action {} ({}) \u001b[0m'.format(entity, rr_idx + 1, actions[rr_idx]))
         
         plt.show()
     
@@ -263,67 +286,66 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
     return VG, RR, mean_iou
 
 
-## evaluates video, and computes:
-# 1) mean model IoU
-# 2) IoU achieved by random selection of a candidate in available frames of a step
-# 3) best IoU possible with candidate bboxes in video
-#compute iou over all candidates
 def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
+    """
+    Return the mean IoUs for model output, random, and best candidates for all entities in a single video
+    model: model for inferencing
+    num_actions: number of actions in video
+    index: video index in dataset directory
+    root: directory path to dataset base
+    Returns mean_ours_iou: mean IoU of model output bboxes and ground truth bboxes
+    Returns mean_rand_iou: mean IoU of randomly selected bboxes and ground truth bboxes
+    Returns mean_best_iou: upper bound mean IoU of candidate bboxes and ground truth bboxes
+    """
     
-    root = "{}/{}/{}".format(root, num_actions, str(index).zfill(5))
-
-    pickle_root = "{}/pickles".format(root)
-    frames_root = "{}/frames".format(root)
-
-    frame_paths = depickle_data(pickle_root, 'frame_paths')
-    entities = depickle_data(pickle_root, 'entities')
-    actions = depickle_data(pickle_root, 'actions_list')
-    actions.append("[NULL]")
-    candidates = depickle_data(pickle_root, 'candidates')
-    vid_id = depickle_data(pickle_root, 'vid_id')
+    # Load data from disk
+    root = os.path.join(root, str(num_actions), str(index).zfill(5))
+    pickles_root = os.path.join(root, 'pickles')
+    frames_root = os.path.join(root, 'frames')
+    frame_paths = depickle_data(pickles_root, 'frame_paths')
+    entities = depickle_data(pickles_root, 'entities')
+    actions = depickle_data(pickles_root, 'actions_list')
+    actions.append('[NULL]')
+    candidates = depickle_data(pickles_root, 'candidates')
+    vid_id = depickle_data(pickles_root, 'vid_id')
+    steps = depickle_data(pickles_root, 'steps')
+    entity_count = depickle_data(pickles_root, 'entity_count')
+    bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_DIM)
+    features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_DIM)
     
-    steps = depickle_data(pickle_root, 'steps')
-    entity_count = depickle_data(pickle_root, 'entity_count')
-    bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_SIZE)
-    features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_SIZE)
-    
+    # Extract ground truth bbox info for entire video
     if gt_bbox_all is None:
-        gt_bbox_all = read_json("/h/sagar/ece496-capstone/datasets/fi_datasets/YCII/VG/gnding_annot_all.json")
-    
+        gt_bbox_all = read_json(FI_VG)
     gt_vid_bbox = gt_bbox_all[vid_id]
     
+    # Run model inference
     VG, RR = model_inference(model, num_actions, steps, entities, entity_count, bboxes, features)
     
-    #calculate mean groundin IoU
-    #1) if gt doesn't have bbox, we skip (doesn't count towards IoU) - since model must ground all entities
-    #2) we look for gt bbox in nearest frame to model grounded one
-    # this may lead to addition leniency in IoU score
-    mean_chosen_iou = 0.0
+    # Calculate mean grounding IoU
     mean_best_iou = 0.0
     mean_rand_iou = 0.0
+    mean_ours_iou = 0.0
     
     num_ents = 0
     
-    for a_idx, action in enumerate(entities[:-1]):        
-        print("Action {}: {}".format(a_idx + 1, actions[a_idx]))
-        print("-------------------------------")
+    for action_idx, action_entities in enumerate(entities[:-1]):        
+        print('--------------------------------------------------')
+        print('Action {}: {}'.format(action_idx + 1, actions[action_idx]))
 
-        if len(action) == 0:
-            print("No entities detected for this action.")
+        # if gt doesn't have bbox, skip (doesn't count towards IoU) - since model must ground all entities
+        if len(action_entities) == 0:
+            print('No entities detected for this action.')
 
         frame_path = None
         prev_frame_path = None
 
-        fig = None
-        axes = None
-
-        #the possible bboxes available for grounding at this frame
-        frame_candidate_bboxes = bboxes[25*a_idx:(25*a_idx + 25)]
+        # all candidates for the current action
+        frame_candidate_bboxes = bboxes[NUM_CANDIDATES_PER_STEP*action_idx : (NUM_CANDIDATES_PER_STEP*(action_idx+1))]
         
-        for e_idx, entity in enumerate(action):
-            # VG processing.
-            offset = NUM_FRAMES_PER_STEP * a_idx
-            candidate = int(VG[a_idx][e_idx])
+        for ent_idx, entity in enumerate(action_entities):
+            # VG processing
+            offset = NUM_FRAMES_PER_STEP * action_idx
+            candidate = int(VG[action_idx][ent_idx])
             vg_idx = offset + math.floor(candidate / NUM_CANDIDATES_PER_FRAME)
 
             prev_frame_path = frame_path
@@ -333,143 +355,132 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all):
             ################################################
             ## processing for ground truth entity bbox
             #index into gt as (action_idx, entity_idx, instance of entity)
-            #str_action_id =  '('+str(a_idx)+', '+str(e_idx) + ', ' + str(0) + ')'
-            vg_keys = get_vg_key(a_idx, e_idx, gt_vid_bbox)
+            #str_action_id =  '('+str(action_idx)+', '+str(ent_idx) + ', ' + str(0) + ')'
+            vg_keys = get_vg_key(action_idx, ent_idx, gt_vid_bbox)
             
+            # look for gt bbox in nearest frame to model output bbox - this may lead to addition leniency in IoU score
             #gt_vid_box[str_action_id]['bboxes']
-            gt_bbox = nearest_in_time(vg_keys_gt_ent=vg_keys, 
-                                     model_frame=frame_path, 
-                                     gt_vid_bbox=gt_vid_bbox)
+            gt_bbox_info = nearest_in_time(vg_keys_gt_ent=vg_keys, 
+                                      model_frame=frame_path, 
+                                      gt_vid_bbox=gt_vid_bbox)
             
-            if gt_bbox is None:
-                print("This entity has no ground truth bounding box")
+            if gt_bbox_info is None:
+                print('This entity has no ground truth bounding box')
                 continue
             
-            #gt_bbox_list, gt_frame
-            gt_bbox_list = [gt_bbox['bbox']['x'],
-                           gt_bbox['bbox']['y'],
-                           gt_bbox['bbox']['w'],
-                           gt_bbox['bbox']['h']]
-            gt_frame = gt_bbox['img']
+            #gt_frame, gt_bbox
+            gt_frame = gt_bbox_info['img']
+            gt_bbox = [gt_bbox_info['bbox']['x'], 
+                       gt_bbox_info['bbox']['y'], 
+                       gt_bbox_info['bbox']['w'], 
+                       gt_bbox_info['bbox']['h']]
             #print(gt_frame)
-            gt_box = Rectangle((gt_bbox_list[0], gt_bbox_list[1]), gt_bbox_list[2], gt_bbox_list[3], linewidth=1, edgecolor='red', facecolor='none')
+            gt_box = Rectangle((gt_bbox[0], gt_bbox[1]), 
+                               gt_bbox[2], 
+                               gt_bbox[3], 
+                               linewidth=1, 
+                               edgecolor='red', 
+                               facecolor='none')
+
+            gt_x0 = gt_bbox[0]
+            gt_y0 = gt_bbox[1]
+            gt_bbox_width = gt_bbox[2]
+            gt_bbox_height = gt_bbox[3]
             
-            gt_bbox_width = gt_bbox_list[2]
-            gt_bbox_height = gt_bbox_list[3]
-            gt_x0 = gt_bbox_list[0]
-            gt_y0 = gt_bbox_list[1]
-            
-            #print("GT frame is {}, model frame is {}".format(gt_frame, frame_path))
+            #print('GT frame is {}, model frame is {}'.format(gt_frame, frame_path))
             
             frame = cv2.imread(frame_path)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_height = frame.shape[0]
             frame_width = frame.shape[1]
 
-            x0, y0 = bbox[0] * frame_width, bbox[1] * frame_height
-            x1, y1 = bbox[2] * frame_width, bbox[3] * frame_height
-
-            bbox_width = x1 - x0
-            bbox_height = y1 - y0
+            # Calculate model output IoU
+            ours_iou = compute_iou_from_normalized_coords(bbox, frame_width, frame_height, gt_bbox)
+            print('Chosen Frame IoU: {}'.format(ours_iou))
             
-            vg_box = [x0, y0, bbox_width, bbox_height]
-            
-       
-            iou = compute_iou(vg_box, gt_bbox_list)
-            print("Chosen Frame's IoU is: {}".format(iou))
-            
+            # Calculate best IoU possible from all candidates for current action
             best_iou = 0.0
+            for candidate_bbox in frame_candidate_bboxes:
+                candidate_iou = compute_iou_from_normalized_coords(candidate_bbox, frame_width, frame_height, gt_bbox)
+                best_iou = max(best_iou, candidate_iou)
+            print('Best IoU possible = {}'.format(best_iou))
             
-            #iterate over all possible choices to find best iou possible
-            for c_bbox in frame_candidate_bboxes:
-                c_x0, c_y0 = c_bbox[0] * frame_width, c_bbox[1] * frame_height
-                c_x1, c_y1 = c_bbox[2] * frame_width, c_bbox[3] * frame_height
+            # Pick a random candidate from all candidates for current action
+            rand_bbox = frame_candidate_bboxes[random.randint(0,NUM_CANDIDATES_PER_STEP-1)]
+            rand_iou = compute_iou_from_normalized_coords(rand_bbox, frame_width, frame_height, gt_bbox)
+            print('Random Candidate IoU = {}'.format(rand_iou))
 
-                c_bbox_width = c_x1 - c_x0
-                c_bbox_height = c_y1 - c_y0
-
-                c_box = [c_x0, c_y0, c_bbox_width, c_bbox_height]
-                
-                c_iou = compute_iou(c_box, gt_bbox_list)
-                
-                if c_iou > best_iou:
-                    best_iou = c_iou
-              
-            print("Best IoU possible = {}".format(best_iou))
-            
-            #pick random candidate of the 5*5 available
-            rand_ind = random.randint(0,24)
-            c_bbox = frame_candidate_bboxes[rand_ind]
-            #iterate over all possible choices to find best iou possible
-              
-            c_x0, c_y0 = c_bbox[0] * frame_width, c_bbox[1] * frame_height
-            c_x1, c_y1 = c_bbox[2] * frame_width, c_bbox[3] * frame_height
-
-            c_bbox_width = c_x1 - c_x0
-            c_bbox_height = c_y1 - c_y0
-
-            c_box = [c_x0, c_y0, c_bbox_width, c_bbox_height]
-
-            c_iou = compute_iou(c_box, gt_bbox_list)
-
-              
-            print("Random Candidate IoU = {}".format(c_iou))
-            
-            mean_rand_iou +=c_iou
+            mean_rand_iou += rand_iou
             mean_best_iou += best_iou
-            mean_chosen_iou += iou
-            num_ents +=1
-            
+            mean_ours_iou += ours_iou
+
+            num_ents += 1
+
     mean_best_iou /= num_ents
-    mean_chosen_iou /= num_ents
+    mean_ours_iou /= num_ents
     mean_rand_iou /= num_ents
     
-    print("Mean Chosen IoU: {}, Random IoU: {}, Best IoU: {}".format(mean_chosen_iou, mean_rand_iou, mean_best_iou))
+    print('Mean Upper Bound IoU: {}, Mean Random IoU: {}, Mean Model Output IoU: {}'.format(mean_best_iou, 
+                                                                                            mean_rand_iou, 
+                                                                                            mean_ours_iou))
     
-    return mean_chosen_iou, mean_rand_iou, mean_best_iou
+    return mean_best_iou, mean_rand_iou, mean_ours_iou
 
 
-def eval_all_dataset(model):
-    #EVAL over all FI dataset
-    num_action_list = [10, 11,12,13,15,17,18,19, 21, 23, 4, 8, 9]
+def eval_all_dataset(model, acc_thresh=0.5):
+    """
+    Print VG evaluation scores for FI dataset
+    model: model for inferencing
+    acc_thresh: IoU threshold for accuracy
+    """
 
-    mean_chosen_ious = []
-    mean_rand_ious = []
     mean_best_ious = []
+    mean_rand_ious = []
+    mean_ours_ious = []
 
-    all_vid_mean_chosen_iou = 0.0
-    all_vid_mean_rand_iou = 0.0
     all_vid_mean_best_iou = 0.0
+    all_vid_mean_rand_iou = 0.0
+    all_vid_mean_ours_iou = 0.0 # ours: model-chosen output
 
-    num_vid=  0
+    vid_count = 0
 
-    for num_action in num_action_list:
-        indices = len(os.listdir(FI+'/'+str(num_action)))
-        #print(indices)
+    num_actions_list = [int(num_actions) for num_actions in sorted(os.listdir(FI))]
+
+    for num_actions in num_actions_list:
+        indices = len(os.listdir(os.path.join(FI, str(num_actions))))
+
         for idx in range(indices):
-            mean_chosen_iou_vid, mean_rand_iou_vid, mean_best_iou_vid =  compute_eval_ious(model, num_actions=num_action, index=idx, root=FI, gt_bbox_all=None)
+            mean_best_iou_vid, mean_rand_iou_vid, mean_ours_iou_vid = compute_eval_ious(model, 
+                                                                                        num_actions=num_actions, 
+                                                                                        index=idx, 
+                                                                                        root=FI, 
+                                                                                        gt_bbox_all=None)
 
-            mean_chosen_ious.append(mean_chosen_iou_vid)
             mean_best_ious.append(mean_best_iou_vid)
             mean_rand_ious.append(mean_rand_iou_vid)
+            mean_ours_ious.append(mean_ours_iou_vid)
 
-            all_vid_mean_chosen_iou += mean_chosen_iou_vid
-            all_vid_mean_rand_iou += mean_rand_iou_vid
             all_vid_mean_best_iou += mean_best_iou_vid
+            all_vid_mean_rand_iou += mean_rand_iou_vid
+            all_vid_mean_ours_iou += mean_ours_iou_vid
 
+            vid_count += 1
 
-            num_vid +=1
-
-    all_vid_mean_chosen_iou /=num_vid
-
-    all_vid_mean_rand_iou /=num_vid
-
-    all_vid_mean_best_iou /=num_vid
-
-  
-    print("All vids - Mean Chosen IoU: {}, Random IoU: {}, Best IoU: {}, num Videos: {}".format(all_vid_mean_chosen_iou, 
-                                                                                                all_vid_mean_rand_iou, 
-                                                                                                all_vid_mean_best_iou,
-                                                                                               num_vid))
-                
+    all_vid_mean_best_iou /= vid_count
+    all_vid_mean_rand_iou /= vid_count
+    all_vid_mean_ours_iou /= vid_count
+    
+    print('--------------------------------------------------')
+    print('All videos evaluation summary:')
+    print('Number of videos: {}'.format(vid_count))
+    print('Mean Upper Bound IoU: {}'.format(all_vid_mean_best_iou))
+    print('Mean Random IoU: {}'.format(all_vid_mean_rand_iou))
+    print('Mean Model Output IoU: {}'.format(all_vid_mean_ours_iou))
+    
+    # TODO: Top-1 accuracy@0.5
+#     print('Proposal Upper Bound: '.format(all_vid_mean_best_acc))
+#     print('Random: '.format(all_vid_mean_rand_acc))
+#     print('Model: '.format(all_vid_mean_ours_acc))
+    
     return
+
