@@ -2,16 +2,16 @@
 # Some modifications have been made.
 
 import PIL.Image
-import utils
+import detector_utils
 import io
 import numpy as np
 import torch
 
 from IPython.display import clear_output, Image, display
-from processing_image import Preprocess
-from visualizing_image import SingleImageViz
-from modeling_frcnn import GeneralizedRCNN
-from utils import Config
+from detector_utils.processing_image import Preprocess
+from detector_utils.visualizing_image import SingleImageViz
+from detector_utils.modeling_frcnn import GeneralizedRCNN
+from detector_utils.utils import Config
 
 class Detector():
     def __init__(self, device):
