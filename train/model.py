@@ -127,7 +127,15 @@ class Model(nn.Module):
         VG_scores_index_flat = VG_scores_index_flat + offsets
 
         loss_V = V_flat[VG_scores_index_flat, :].reshape(BATCH_SIZE, (NUM_ACTIONS - 1), max_entities, -1)
-
+        
+        mask = torch.ones(sum(torch.tensor(entity_count).flatten().tolist())).to(self.device)
+        mask = mask.split(split_sizes)
+        mask = pad_sequence(mask, batch_first=True).reshape((BATCH_SIZE, (NUM_ACTIONS - 1), -1))
+        mask = einops.repeat(mask, 'b a e -> b a e d', d=loss_V.shape[-1])
+        
+        loss_V = mask * loss_V
+        
+        # KL-divergence loss data.
         distributions = F.log_softmax(VG_scores, dim=3)
         entity_indices = torch.arange(0, E.shape[2])
         combinations = torch.combinations(entity_indices)

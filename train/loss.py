@@ -56,11 +56,11 @@ def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
     #scores[scores.isnan()] = float('-inf')
 
     # The best alignment score between e_mj and b_lk (over all k).
-    max_k_align = scores.max(3)[0]
+    max_k_align = scores.max(dim=-1)[0]
     #max_k_align[max_k_align == float('-inf')] = 0
     
     # Sum all of the best alignment scores from e_mj (over all j).
-    S_lm = max_k_align.sum(3)
+    S_lm = max_k_align.sum(dim=-1)
 
     # Find the transposed version.
     S_ml = S_lm.transpose(1, 2)
@@ -88,7 +88,7 @@ def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
 
     print("(Alignment Loss: {}, KL_Div Loss: {}".format(loss_alignment, loss_KL_div))
 
-    loss = loss_alignment + loss_KL_div_eff
+    loss = loss_alignment #+ loss_KL_div_eff
 
     return loss
 
