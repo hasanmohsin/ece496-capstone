@@ -358,7 +358,8 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
 
             prev_frame_path = frame_path
             frame_path = frame_paths[vg_idx]
-            bbox = bboxes[candidate]
+#             bbox = bboxes[candidate]
+            bbox = bboxes[offset*NUM_CANDIDATES_PER_FRAME + candidate]
             
             ################################################
             ## processing for ground truth entity bbox
@@ -416,7 +417,10 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             print('Best IoU possible = {}'.format(best_iou))
             if best_iou >= acc_thresh:
                 best_correct += 1
-
+            
+            if best_iou < ours_iou:
+                print('ERROR: Best IoU < Chosen IoU')
+            
             # Pick a random candidate from all candidates for current action
             rand_bbox = frame_candidate_bboxes[random.randint(0,NUM_CANDIDATES_PER_STEP-1)]
             rand_iou = compute_iou_from_normalized_coords(rand_bbox, frame_width, frame_height, gt_bbox)
