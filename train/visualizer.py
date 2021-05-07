@@ -55,6 +55,16 @@ def inference(model, num_actions, index, root, NUM_CANDIDATES_PER_FRAME = 20):
             frame_path = frame_paths[vg_idx]
             bbox = bboxes[candidate]
 
+            # If the videos are downloaded outside by another user, the frame 
+            # paths use that user's directory. Replace the user in this case.
+
+            path_split = frame_path.split('/')
+            user = path_split[2]
+            
+            if user != 'sagar':
+                path_split[2] = 'sagar'
+                frame_path = '/'.join(path_split)
+
             frame = cv2.imread(frame_path)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_height = frame.shape[0]

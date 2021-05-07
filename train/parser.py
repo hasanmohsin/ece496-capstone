@@ -5,13 +5,14 @@ nlp = spacy.load('en_core_web_sm')
 
 def parse(steps, max_step_length=None):
     entities = []
+
     for step in steps:
         ents = list(get_entities(step).values())
         if len(ents) == 0:
             entities.append([])
         else:
             entities.append(ents[0])
-    #entities = [list(get_entities(step).values())[0] for step in steps]
+
     indices = []
 
     for idx, data in enumerate(zip(entities, steps)):
@@ -50,7 +51,10 @@ def get_index(sentence, entity, start=0, shift=0):
         if len(mapping) == words_count:
             break
 
-    return mapping, (mapping[-1] + 1 - shift)
+    if len(mapping) == 0:
+        return mapping, (start + 1 - shift)
+    else:
+        return mapping, (mapping[-1] + 1 - shift)
 
 def get_entities(sentence):
     doc = nlp(sentence)
