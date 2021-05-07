@@ -8,21 +8,21 @@ import torch
 
 from dataset import depickle_data
 from matplotlib.patches import Rectangle
+from model import Model
 from visualizer import *
 
 
-## NOTE: only tested with 5 detections per frame, 5 frames per step
-NUM_CANDIDATES_PER_FRAME = 5
+NUM_CANDIDATES_PER_FRAME = 20
 NUM_FRAMES_PER_STEP = 5
 NUM_CANDIDATES_PER_STEP = NUM_CANDIDATES_PER_FRAME * NUM_FRAMES_PER_STEP
 DETECTION_EMBEDDING_DIM = 2048
 BOUNDING_BOX_DIM = 4
 
-NULL = '[unused1]'
-
 FI = '/h/sagar/ece496-capstone/datasets/fi'
 FI_VG = '/h/sagar/ece496-capstone/datasets/fi_datasets/YCII/VG/gnding_annot_all.json'
 
+
+############### HELPER FUNCTIONS ###################
 def read_json(path='output.json'):
     """
     Check for valid JSON format and read content
@@ -38,7 +38,6 @@ def read_json(path='output.json'):
     return parsed_json
 
 
-############### HELPER FUNCTIONS ###################
 def compute_iou(bbox_a, bbox_b):
     """
     Return the IoU of bbox_a and bbox_b
@@ -154,9 +153,10 @@ def get_vg_key(action_id, match_ent_id, gt_vid_bbox):
 
     return [k for k in keys if eval(k)[0] == action_id and eval(k)[1] == match_ent_id]
 
+
 ############# EVALUATE, WITH VISUALIZATION############################
 
-# TODO: this function is largely a duplication of the previous version of compute_eval_ious function. Need to refactor code.
+# TODO: this function is largely a duplication of an older version of compute_eval_ious function. Need to refactor code.
 #evaluates Mean IoU of model, and draws gt bboxes + model bboxes
 #example run: VG, RR, mean_iou_pretrained = eval_im(model, num_actions=10, index=2, root=FI, gt_bbox_all=None)
 def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
@@ -358,7 +358,6 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
 
             prev_frame_path = frame_path
             frame_path = frame_paths[vg_idx]
-#             bbox = bboxes[candidate]
             bbox = bboxes[offset*NUM_CANDIDATES_PER_FRAME + candidate]
             
             ################################################
@@ -403,12 +402,6 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             frame_height = frame.shape[0]
             frame_width = frame.shape[1]
 
-            # Calculate model output IoU
-            ours_iou = compute_iou_from_normalized_coords(bbox, frame_width, frame_height, gt_bbox)
-            print('Chosen Frame IoU: {}'.format(ours_iou))
-            if ours_iou >= acc_thresh:
-                ours_correct += 1
-
             # Calculate best IoU possible from all candidates for current action
             best_iou = 0.0
             for candidate_bbox in frame_candidate_bboxes:
@@ -418,9 +411,6 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             if best_iou >= acc_thresh:
                 best_correct += 1
             
-            if best_iou < ours_iou:
-                print('ERROR: Best IoU < Chosen IoU')
-            
             # Pick a random candidate from all candidates for current action
             rand_bbox = frame_candidate_bboxes[random.randint(0,NUM_CANDIDATES_PER_STEP-1)]
             rand_iou = compute_iou_from_normalized_coords(rand_bbox, frame_width, frame_height, gt_bbox)
@@ -428,8 +418,16 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             if rand_iou >= acc_thresh:
                 rand_correct += 1
 
-            mean_rand_iou += rand_iou
+            # Calculate model output IoU
+            ours_iou = compute_iou_from_normalized_coords(bbox, frame_width, frame_height, gt_bbox)
+            print('Chosen Frame IoU: {}'.format(ours_iou))
+            if ours_iou >= acc_thresh:
+                ours_correct += 1
+            if ours_iou > best_iou:
+                print('ERROR: Best IoU < Chosen IoU')
+                
             mean_best_iou += best_iou
+            mean_rand_iou += rand_iou
             mean_ours_iou += ours_iou
 
             num_ents += 1
@@ -517,3 +515,16 @@ def eval_all_dataset(model, acc_thresh=0.5):
     
     return
 
+
+def eval_fi():
+    """
+    Wrapper function for eval_all_dataset function
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = Model(device, MAX_DETECTIONS=20)
+    eval_all_dataset(model)
+
+
+if __name__ == "__main__":
+    eval_fi()
+    
