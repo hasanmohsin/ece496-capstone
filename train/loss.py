@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 
-def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
+def loss_RA_MIL(y=1, B=None, M=None, VG_dist1=None, VG_dist2=None, scores=None, Y=None):
     '''
     Custom loss function for reference-aware visual grounding. This function must
     use PyTorch functions for any parameters that are to be trained. Some of the
@@ -38,26 +38,9 @@ def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
             -----------------------
             The size of the matrix is B x M x J x 768. E_mj contains the reference aware entity embedding
             of e_mj. Since each the steps may have a different number of entities.
-    '''
-    B = E.shape[0]
-    M = E.shape[1]
-    J = E.shape[2]
-
-    # Compute the outer product between E and V. This essentially calculates
-    # all possible alignment scores across the entire video. scores_lmjk is
-    # the alignment score of e_mj and b_lk (same as equation). The size of
-    # the matrix is B x M x J x M x J.
-    #
-    # Ref: stackoverflow.com/questions/24839481/python-matrix-outer-product
-    #
-    # Note that the alignment score for the padding matrices will be -inf due
-    # to the way they're configured (1 * -inf).
-    scores = torch.einsum('bmjd, blkd -> blmjk', E, V)
-    #scores[scores.isnan()] = float('-inf')
-
+    '''        
     # The best alignment score between e_mj and b_lk (over all k).
     max_k_align = scores.max(dim=-1)[0]
-    #max_k_align[max_k_align == float('-inf')] = 0
     
     # Sum all of the best alignment scores from e_mj (over all j).
     S_lm = max_k_align.sum(dim=-1)
@@ -68,9 +51,9 @@ def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
     # Compute reference based penalty. 1 if none of the entities in e_m refer
     # to a_l, constant (hyperparameter) otherwise. We can use R since it has
     # the mappings between each of the actions. This is a M x M matrix.
-    Y_lm = torch.clamp(R[:,:,:-1] + y, 0.0, 1.0)
+    Y_lm = torch.clamp(Y[:,:,:-1] + y, 0.0, 1.0)
     Y_ml = Y_lm.transpose(1, 2)
-
+        
     # Zero matrix.
     zero = torch.zeros(B, M, M, dtype=torch.float).cuda()
 
@@ -81,15 +64,16 @@ def loss_RA_MIL(y, R, E, V, VG_dist1, VG_dist2):
     # Vectorization magic.
     loss_alignment = (Y_lm * torch.max(zero, S_lm - S_ll) + Y_ml * torch.max(zero, S_ml - S_ll)).sum()
     
+    loss = loss_alignment
+    
     # Include KL divergence.
-    target = B * 250
-    loss_KL_div = F.kl_div(VG_dist1, VG_dist2, log_target=True, reduction='sum')
-    loss_KL_div_eff = target - torch.clamp(loss_KL_div, max=target)
+    if VG_dist1 is not None and VG_dist2 is not None:
+        target = B * 250
+        loss_KL_div = F.kl_div(VG_dist1, VG_dist2, log_target=True, reduction='sum')
+        loss_KL_div_eff = target - torch.clamp(loss_KL_div, max=target)
+        loss = loss + loss_KL_div_eff
+        print("KL_Div Loss: {}".format(loss_KL_div)) 
 
-    print("(Alignment Loss: {}, KL_Div Loss: {}".format(loss_alignment, loss_KL_div))
-
-    loss = loss_alignment #+ loss_KL_div_eff
+    print("Alignment Loss: {}".format(loss_alignment))
 
     return loss
-
-    #return loss_alignment

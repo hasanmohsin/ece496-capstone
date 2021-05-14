@@ -382,6 +382,11 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
                        gt_bbox_info['bbox']['y'], 
                        gt_bbox_info['bbox']['w'], 
                        gt_bbox_info['bbox']['h']]
+            
+            if gt_bbox[0] is None or gt_bbox[1] is None or gt_bbox[2] is None or gt_bbox[3] is None:
+                print('Atleast one of the bounding box coordinates is missing.')
+                continue
+            
             #print(gt_frame)
             gt_box = Rectangle((gt_bbox[0], gt_bbox[1]), 
                                gt_bbox[2], 
@@ -396,6 +401,13 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             gt_bbox_height = gt_bbox[3]
             
             #print('GT frame is {}, model frame is {}'.format(gt_frame, frame_path))
+            
+            path_split = frame_path.split('/')
+            user = path_split[2]
+            
+            if user != 'sagar':
+                path_split[2] = 'sagar'
+                frame_path = '/'.join(path_split)
             
             frame = cv2.imread(frame_path)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)

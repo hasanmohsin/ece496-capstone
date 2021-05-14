@@ -113,7 +113,7 @@ class Model(nn.Module):
 
         # Calculate loss_E.
         loss_E = E
-
+        
         # Calculate VG (VG_scores_index) and loss_V.
         VG_scores = torch.einsum('bacs, baes -> baec', V, E)
         VG_scores_max, VG_scores_index = VG_scores.max(dim=-1)
@@ -133,8 +133,6 @@ class Model(nn.Module):
         mask = pad_sequence(mask, batch_first=True).reshape((BATCH_SIZE, (NUM_ACTIONS - 1), -1))
         mask = einops.repeat(mask, 'b a e -> b a e d', d=loss_V.shape[-1])
         
-        loss_V = mask * loss_V
-        
         # KL-divergence loss data.
         distributions = F.log_softmax(VG_scores, dim=3)
         entity_indices = torch.arange(0, E.shape[2])
@@ -148,17 +146,24 @@ class Model(nn.Module):
         VG_dist2 = pair_2.reshape(-1, pair_2.shape[-1])
 
         # Calculate loss_R.
-        loss_R = torch.ones((BATCH_SIZE, (NUM_ACTIONS - 1), NUM_ACTIONS)).to(self.device)
+        Y = torch.ones((BATCH_SIZE, (NUM_ACTIONS - 1), NUM_ACTIONS)).to(self.device)
 
         dim_1 = torch.arange((NUM_ACTIONS -1)).repeat_interleave(max_entities)
         dim_1 = einops.repeat(dim_1, 'd -> b d', b=BATCH_SIZE)
         dim_2 = RR_scores_index.reshape(BATCH_SIZE, -1)
 
-        loss_R[:, dim_1, dim_2] = 0.0
+        Y[:, dim_1, dim_2] = 0.0
 
-        #entity embeddings, selected visual grounding embeddings, adjacency list for
-        #ref resolution
-        return loss_E, loss_V, loss_R, VG_dist1, VG_dist2, VG_scores_index, RR_scores_index, A, E, V
+        # Alignment loss scores.
+        mask = torch.einsum('bmjd, blkd -> blmjk', mask, mask)
+        scores = torch.einsum('bmjd, blkd -> blmjk', loss_E, loss_V)
+        
+        scores_min = float(scores.min())
+        scores_min = torch.full(scores.shape, scores_min - 1).to(self.device)
+        
+        scores = torch.where(mask == 0, scores_min, scores)
+        
+        return scores, Y, BATCH_SIZE, (NUM_ACTIONS - 1), None, None, VG_scores_index, RR_scores_index
 
 #HELPER FUNCTIONS FOR REPRESENTING ENTITY AS AVERAGE OF ITS FEATURES 
 def contains(sub, pri):
@@ -198,7 +203,6 @@ def get_ent_inds(model, entity_list, steps_list):
         entity_batch_index_list= []
         
         vid_step_list = steps_list[b]
-        
         
         action_list =vid_step_list.split('[unused3]')[:-1]
         

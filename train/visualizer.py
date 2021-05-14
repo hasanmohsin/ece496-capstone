@@ -104,5 +104,9 @@ def model_inference(model, num_actions, steps, entities, entity_count, bboxes, f
     features = features.unsqueeze(0)
 
     with torch.no_grad():
-        _, _, _, _, _, VG, RR, _, _, _ = model(1, num_actions + 1, steps, features, bboxes, entity_count, entities)
+        _, _, _, _, _, _, VG, RR = model(1, num_actions + 1, steps, features, bboxes, entity_count, entities)
+        
+        if RR is None:
+            RR = torch.zeros(VG.shape)
+        
         return VG.squeeze(0), RR.squeeze(0)
