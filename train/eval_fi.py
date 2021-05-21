@@ -159,7 +159,7 @@ def get_vg_key(action_id, match_ent_id, gt_vid_bbox):
 # TODO: this function is largely a duplication of an older version of compute_eval_ious function. Need to refactor code.
 #evaluates Mean IoU of model, and draws gt bboxes + model bboxes
 #example run: VG, RR, mean_iou_pretrained = eval_im(model, num_actions=10, index=2, root=FI, gt_bbox_all=None)
-def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
+def vis_eval_im(model, num_actions, index, root, gt_bbox_all=None):
     
     root = os.path.join(root, str(num_actions), str(index).zfill(5))
     pickles_root = os.path.join(root, 'pickles')
@@ -182,6 +182,8 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
     gt_vid_bbox = gt_bbox_all[vid_id]
     
     VG, RR = model_inference(model, num_actions, steps, entities, entity_count, bboxes, features)
+    
+    #print(VG)
     
     # calculate mean grounding IoU
     #1) if gt doesn't have bbox, we skip (doesn't count towards IoU) - since model must ground all entities
@@ -211,7 +213,20 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
 
             prev_frame_path = frame_path
             frame_path = frame_paths[vg_idx]
-            bbox = bboxes[candidate]
+            
+            #correct the frame_path
+            #################################################
+            path_split = frame_path.split('/')
+            user = path_split[2]
+            
+            if user != 'sagar':
+                path_split[2] = 'sagar'
+                frame_path = '/'.join(path_split)
+            ###################################################
+            
+            frame_candidate_bboxes = bboxes[NUM_CANDIDATES_PER_STEP*action_idx : (  NUM_CANDIDATES_PER_STEP*(action_idx+1))]
+            bbox = frame_candidate_bboxes[candidate]
+           
             
             ################################################
             ## processing for ground truth entity bbox
@@ -245,7 +260,7 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all):
             gt_y0 = gt_bbox_list[1]
             
             #print('GT frame is {}, model frame is {}'.format(gt_frame, frame_path))
-            
+            print(frame_path)
             frame = cv2.imread(frame_path)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame_height = frame.shape[0]
