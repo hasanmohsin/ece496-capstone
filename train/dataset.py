@@ -14,6 +14,14 @@ def depickle_data(pickles_dir, fname):
     pickle_in = open(pickle_path, 'rb')
     data = pickle.load(pickle_in)
     return data
+
+def remove_unused2(steps_list):
+    steps_list_rm = []
+    for b in range(len(steps_list)):
+        step_rm = " ".join([s for s in steps_list[b].split(' ') if s != '[unused2]'])
+        steps_list_rm.append(step_rm)
+        
+    return steps_list_rm
     
 class YouCookII(Dataset):
     def __init__(self, num_actions, root):
@@ -40,6 +48,9 @@ class YouCookII(Dataset):
         
         indices = depickle_data(pickles_root, 'indices')
         max_step_length = depickle_data(pickles_root, 'max_step_length')
+        
+        # Remove [unused2] tokens from steps.
+        steps = remove_unused2([steps])[0]
         
         return video_id, bboxes, features, actions, steps, entities, entity_count, indices, max_step_length
     

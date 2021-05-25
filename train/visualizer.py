@@ -58,7 +58,7 @@ def inference(model, num_actions, index, root, NUM_CANDIDATES_PER_FRAME = 20):
             
             #it is incorrect to only pick 'candidate' bbox - since candidate is the index
             #within  a steps bboxes
-            frame_candidate_bboxes = bboxes[NUM_CANDIDATES_PER_STEP*a_idx : (  NUM_CANDIDATES_PER_STEP*(a_idx+1))]
+            frame_candidate_bboxes = bboxes[NUM_CANDIDATES_PER_STEP*a_idx:(NUM_CANDIDATES_PER_STEP*(a_idx+1))]
             bbox = frame_candidate_bboxes[candidate]
 
             # If the videos are downloaded outside by another user, the frame 
@@ -110,20 +110,9 @@ def model_inference(model, num_actions, steps, entities, entity_count, bboxes, f
     features = features.unsqueeze(0)
 
     with torch.no_grad():
-       # _, _, _, _, _, _, VG, RR = model(1, num_actions + 1, steps, features, bboxes, entity_count, entities)
-        E,V,VG,outputs,inputs = model(1, num_actions+1, steps, features, bboxes, entity_count, entities)
-        #print(entity_count)
-        #print(max(entity_count[0]))
-        VG_matrix = torch.zeros(1,len(VG),max(entity_count[0]))
-
-        for i in range(len(VG)):
-            ent_inds = VG[i][0]
-
-            for idx, ent_bbox_idx in enumerate(ent_inds):
-                VG_matrix[0,i,idx] = ent_bbox_idx
+        _, VG, RR = model(1, num_actions, steps, features, bboxes, entities, entity_count)
         
-        RR= None
         if RR is None:
-            RR = torch.zeros(VG_matrix.shape)
+            RR = torch.zeros(1, num_actions, (num_actions + 1))
         
-        return VG_matrix.squeeze(0), RR.squeeze(0)
+        return VG.squeeze(0), RR.squeeze(0)
