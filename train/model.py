@@ -12,8 +12,6 @@ from torch.nn.utils.rnn import pad_sequence
 from entity_utils import *
 
 class Model(nn.Module):
-    ACTION = '[unused3]'
-
     DETECTION_EMBEDDING_SIZE = 2048
     OUTPUT_EMBEDDING_SIZE = 768
 
@@ -26,11 +24,7 @@ class Model(nn.Module):
         self.MAX_DETECTIONS = MAX_DETECTIONS
 
         self.lxmert_tokenizer = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
-        self.lxmert_tokenizer.add_special_tokens({"additional_special_tokens": [self.ACTION]})
-        self.lxmert_tokenizer.encode([self.ACTION])
-
-        self.ACTION_TOKEN = self.lxmert_tokenizer.convert_tokens_to_ids(self.ACTION)
-
+        
         self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.lxmert.to(device)
 
@@ -72,7 +66,7 @@ class Model(nn.Module):
 
         # Extract both vision (candidate) and language (entity) embeddings.
         language_embeddings = get_entity_embeddings(output['language_output'], entity_idx)
-        vision_embeddings = output['vision_output']
+        vision_embeddings = output['vision_output']        
         
         # Batch together the entities with padding.
         split_sizes = torch.tensor(entity_count).flatten().tolist()

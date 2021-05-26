@@ -1,19 +1,22 @@
 import torch
 
 
-def get_alignment_loss(model, dataloader, batch_size, num_actions):
+def get_alignment_loss(model, dataloader, batch_size, num_actions, margin=10):
     loss = 0
+    num_batches = 0
     
     with torch.no_grad():
         for data in dataloader:
             _, boxes, features, steps, entities, entity_count, _, _ = data
             loss_data, VG, RR = model(batch_size, num_actions, steps, features, boxes, entities, entity_count)
             
-            loss = loss + compute_loss_batched(loss_data)
-        
-    return loss
+            loss = loss + compute_loss_batched(loss_data, margin)
+            num_batches += 1
+    
+     
+    return loss / (num_batches * batch_size)
 
-def compute_loss_batched(loss_data, margin=0):
+def compute_loss_batched(loss_data, margin=10):
     loss = 0
     
     alignment_scores, entity_count, BATCH_SIZE, NUM_ACTIONS, MAX_ENTITIES = loss_data
@@ -46,6 +49,8 @@ def compute_loss(loss_data, margin=0):
     
     for l in range(NUM_ACTIONS):
         for m in range(NUM_ACTIONS):
+            if l == m:
+                continue
             loss = loss + torch.max(S[l][m] - S[l][l] + margin, zero) + torch.max(S[m][l] - S[l][l] + margin, zero)
             
     return loss

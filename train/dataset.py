@@ -22,12 +22,24 @@ def remove_unused2(steps_list):
         steps_list_rm.append(step_rm)
         
     return steps_list_rm
+
+def remove_unused3(steps_list):
+    steps_list_rm = []
+    for b in range(len(steps_list)):
+        step_rm = " ".join([s for s in steps_list[b].split(' ') if s != '[unused3]'])
+        steps_list_rm.append(step_rm)
+        
+    return steps_list_rm
     
 class YouCookII(Dataset):
-    def __init__(self, num_actions, root):
+    def __init__(self, num_actions, root, size=None):
         self.root = root
         self.path = '{}/{}'.format(root, num_actions)
-        self.size = len([directory for directory in os.listdir(self.path)])
+        
+        if size is not None:
+            self.size = size
+        else:
+            self.size = len([directory for directory in os.listdir(self.path)])
         
     def __len__(self):
         return self.size
@@ -49,8 +61,9 @@ class YouCookII(Dataset):
         indices = depickle_data(pickles_root, 'indices')
         max_step_length = depickle_data(pickles_root, 'max_step_length')
         
-        # Remove [unused2] tokens from steps.
+        # Remove [unused2] and [unused3] tokens from steps.
         steps = remove_unused2([steps])[0]
+        steps = remove_unused3([steps])[0]
         
         return video_id, bboxes, features, actions, steps, entities, entity_count, indices, max_step_length
     

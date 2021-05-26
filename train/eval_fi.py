@@ -6,7 +6,7 @@ import os
 import random
 import torch
 
-from dataset import depickle_data
+from dataset import *
 from matplotlib.patches import Rectangle
 from model import Model
 from visualizer import *
@@ -176,6 +176,9 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all=None):
     bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_DIM)
     features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_DIM)
     
+    steps = remove_unused2([steps])[0]
+    steps = remove_unused3([steps])[0]
+    
     if gt_bbox_all is None:
         gt_bbox_all = read_json(FI_VG)
     
@@ -332,6 +335,11 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
     bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_DIM)
     features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_DIM)
     
+    steps = remove_unused2([steps])[0]
+    steps = remove_unused3([steps])[0]
+    
+    #steps = steps.replace('[unused3]', '[ unused 3 ]')
+    
     # Extract ground truth bbox info for entire video
     if gt_bbox_all is None:
         gt_bbox_all = read_json(FI_VG)
@@ -475,12 +483,13 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
     return mean_best_iou, mean_rand_iou, mean_ours_iou, best_acc, rand_acc, ours_acc
 
 
-def eval_all_dataset(model, acc_thresh=0.5):
+def eval_all_dataset(model, acc_thresh=0.5, path='/h/sagar/ece496-capstone/datasets/fi'):
     """
     Print VG evaluation scores for FI dataset
     model: model for inferencing
     acc_thresh: IoU threshold for accuracy
     """
+    FI = path
 
     mean_best_ious = []
     mean_rand_ious = []
