@@ -7,12 +7,13 @@ import einops
 import torch.nn.functional as F
 
 from transformers import LxmertModel, LxmertTokenizer
+from transformers import get_linear_schedule_with_warmup
 from torch import nn
 from torch.nn.utils.rnn import pad_sequence
 from entity_utils import *
-
 from loss import *
 from accuracy import *
+from eval_fi import eval_all_dataset
 
 # Lightning module imports.
 
@@ -24,33 +25,26 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader, random_split
 import pytorch_lightning as pl
-
-
-class Model(nn.Module):
+    
+class LitModel(pl.LightningModule):
     DETECTION_EMBEDDING_SIZE = 2048
     OUTPUT_EMBEDDING_SIZE = 768
-
-    def __init__(self, device, NUM_FRAMES_PER_STEP=5, MAX_DETECTIONS=20):
-        super(Model, self).__init__()
-
-        self.device = device
-
+    
+    def __init__(self, NUM_FRAMES_PER_STEP=5, MAX_DETECTIONS=20, max_epochs=100, lr=1e-4, batch_size=4):
+        super().__init__()
+        
         self.NUM_FRAMES_PER_STEP = NUM_FRAMES_PER_STEP
         self.MAX_DETECTIONS = MAX_DETECTIONS
         self.CANDIDATES = self.NUM_FRAMES_PER_STEP * self.MAX_DETECTIONS
-
-        self.lxmert_tokenizer = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         
+        self.lxmert_tokenizer = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-        self.lxmert = nn.DataParallel(self.lxmert)
-        self.lxmert.to(device)
-
+        
+        self.save_hyperparameters()
+        
     def forward(self, steps, features, boxes, entities, entity_count):
         BATCH_SIZE = len(entity_count)
         NUM_ACTIONS = len(entity_count[0])
-
-        features = features.to(self.device)
-        boxes = boxes.to(self.device)
         
         inputs = self.lxmert_tokenizer(
             steps,
@@ -61,7 +55,8 @@ class Model(nn.Module):
             add_special_tokens=True,
             return_tensors="pt"
         )
-
+        
+        # Need to manually put these on GPU for some reason. Lightning doesn't detect it!
         inputs.input_ids = inputs.input_ids.to(self.device)
         inputs.attention_mask = inputs.attention_mask.to(self.device)
         inputs.token_type_ids = inputs.token_type_ids.to(self.device)
@@ -108,3 +103,42 @@ class Model(nn.Module):
         loss_data = (alignment_scores, entity_count, BATCH_SIZE, NUM_ACTIONS, MAX_ENTITIES)
         
         return loss_data, VG_scores_index, None
+    
+    def training_step(self, batch, batch_idx):
+        _, bboxes, features, steps, entities, entity_count, _, _ = batch
+        loss_data, VG, RR = self(steps, features, bboxes, entities, entity_count)
+        
+        loss_ = compute_loss_batched(loss_data) / self.batch_size
+        
+        total, correct = compute_alignment_accuracy_batched(loss_data)
+        accuracy = correct / total
+        
+        self.log('loss', loss_, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True)
+        
+        return {'loss': loss_, 'accuracy': accuracy}
+    
+    def validation_step(self, batch, batch_idx):
+        _, bboxes, features, steps, entities, entity_count, _, _ = batch
+        loss_data, VG, RR = self(steps, features, bboxes, entities, entity_count)
+        
+        loss_ = compute_loss_batched(loss_data) / self.batch_size
+        
+        total, correct = compute_alignment_accuracy_batched(loss_data)
+        accuracy = correct / total
+        
+        self.log('loss', loss_, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True)
+        
+        return {'loss': loss_, 'accuracy': accuracy}
+        
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=1e-3)
+                
+        scheduler = {'scheduler': get_linear_schedule_with_warmup(optimizer, int(0.2 * self.hparams.max_epochs), self.hparams.max_epochs),
+                     'name': 'learning_rate',
+                     'interval': 'epoch',
+                     'frequency': 1}
+        
+        return [optimizer], [scheduler]
+    

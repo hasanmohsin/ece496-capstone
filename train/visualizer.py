@@ -32,7 +32,7 @@ def inference(model, num_actions, index, root, NUM_CANDIDATES_PER_FRAME = 20):
     bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_SIZE)
     features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_SIZE)
 
-    VG, RR = model_inference(model, num_actions, steps, entities, entity_count, bboxes, features)
+    VG, RR = model_inference(model, steps, entities, entity_count, bboxes, features)
     
     for a_idx, action in enumerate(entities[:-1]):        
         print("Action {}: {}".format(a_idx + 1, actions[a_idx]))
@@ -99,10 +99,11 @@ def inference(model, num_actions, index, root, NUM_CANDIDATES_PER_FRAME = 20):
 
     return VG, RR
 
-def model_inference(model, num_actions, steps, entities, entity_count, bboxes, features):
+def model_inference(model, steps, entities, entity_count, bboxes, features):
     model.eval()
     
     steps = [steps]
+    num_actions = len(entity_count)
     entity_count = [entity_count]
     entities = [entities]
     
@@ -110,7 +111,7 @@ def model_inference(model, num_actions, steps, entities, entity_count, bboxes, f
     features = features.unsqueeze(0)
 
     with torch.no_grad():
-        _, VG, RR = model(1, num_actions, steps, features, bboxes, entities, entity_count)
+        _, VG, RR = model(steps, features, bboxes, entities, entity_count)
         
         if RR is None:
             RR = torch.zeros(1, num_actions, (num_actions + 1))

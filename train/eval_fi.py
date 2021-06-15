@@ -176,8 +176,8 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all=None):
     bboxes = torch.stack(list(zip(*candidates))[0]).squeeze(1).reshape(-1, BOUNDING_BOX_DIM)
     features = torch.stack(list(zip(*candidates))[1]).squeeze(1).reshape(-1, DETECTION_EMBEDDING_DIM)
     
-    steps = remove_unused2([steps])[0]
-    steps = remove_unused3([steps])[0]
+    steps = remove_unused2([steps])[0] # UNUSED2 = entities
+    steps = remove_unused3([steps])[0] # UNUSED3 = actions
     
     if gt_bbox_all is None:
         gt_bbox_all = read_json(FI_VG)
@@ -346,7 +346,7 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
     gt_vid_bbox = gt_bbox_all[vid_id]
     
     # Run model inference
-    VG, RR = model_inference(model, num_actions, steps, entities, entity_count, bboxes, features)
+    VG, RR = model_inference(model, steps, entities, entity_count, bboxes, features)
     
     # Calculate mean grounding IoU
     mean_best_iou = 0.0

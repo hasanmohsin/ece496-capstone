@@ -1,14 +1,14 @@
 import torch
 
 
-def get_alignment_loss(model, dataloader, batch_size, num_actions, margin=10):
+def get_alignment_loss(model, dataloader, batch_size, margin=10):
     loss = 0
     num_batches = 0
     
     with torch.no_grad():
         for data in dataloader:
             _, boxes, features, steps, entities, entity_count, _, _ = data
-            loss_data, VG, RR = model(batch_size, num_actions, steps, features, boxes, entities, entity_count)
+            loss_data, VG, RR = model(steps, features, boxes, entities, entity_count)
             
             loss = loss + compute_loss_batched(loss_data, margin)
             num_batches += 1

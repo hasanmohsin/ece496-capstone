@@ -1,14 +1,14 @@
 import torch
 
 
-def get_alignment_accuracy(model, dataloader, batch_size, num_actions):
+def get_alignment_accuracy(model, dataloader, batch_size):
     total = 0
     correct = 0
         
     with torch.no_grad():
         for data in dataloader:
             _, boxes, features, steps, entities, entity_count, _, _ = data
-            loss_data, VG, RR = model(batch_size, num_actions, steps, features, boxes, entities, entity_count)
+            loss_data, VG, RR = model(steps, features, boxes, entities, entity_count)
             
             _total, _correct = compute_alignment_accuracy_batched(loss_data)
 
