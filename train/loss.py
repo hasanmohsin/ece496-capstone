@@ -1,20 +1,20 @@
 import torch
 
 
-def get_alignment_loss(model, dataloader, batch_size, margin=10):
-    loss = 0
-    num_batches = 0
-    
+def get_alignment_loss(model, dataloaders, margin=10):
+    loss = 0    
+    datapoints = 0
+        
     with torch.no_grad():
-        for data in dataloader:
-            _, boxes, features, steps, entities, entity_count, _, _ = data
-            loss_data, VG, RR = model(steps, features, boxes, entities, entity_count)
-            
-            loss = loss + compute_loss_batched(loss_data, margin)
-            num_batches += 1
+        for dataloader in dataloaders:
+            for data in dataloader:
+                _, boxes, features, actions, steps, entities, entity_count, _ = data
+                loss_data, VG, RR = model(steps, features, boxes, entities, entity_count)
+
+                loss = loss + compute_loss_batched(loss_data, margin)
+                datapoints += len(steps) * len(actions[0])
     
-     
-    return loss / (num_batches * batch_size)
+    return loss / datapoints
 
 def compute_loss_batched(loss_data, margin=10):
     loss = 0
