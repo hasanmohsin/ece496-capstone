@@ -1,3 +1,12 @@
+import os
+import argparse
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+import random
+import sys
+
+
 from dataset import YouCookII
 from dataset import YouCookIICollate
 from torch.utils.data import DataLoader
@@ -6,12 +15,7 @@ from accuracy import *
 from transformers import get_linear_schedule_with_warmup
 from model import Model
 
-import os
-import argparse
-import numpy as np
-import torch
-import matplotlib.pyplot as plt
-import random
+
 
 from eval_fi import eval_all_dataset
 
@@ -167,7 +171,7 @@ def main(args):
 
     if not args.no_train:
 
-        print("Training Start.")
+        print("\n---------Training Start.-------------\n")
 
         train_loss, valid_loss, train_accuracy, valid_accuracy, VG, loss_data, data = train(
             model, 
@@ -182,13 +186,13 @@ def main(args):
             valid_set_type=  args.valid_set_type
         )
 
-        print("Training Done!")
+        print("\n-------------Training Done!----------\n")
 
     if not args.no_eval:
-        print("Eval Start.")
+        print("\n----------------Eval Start.----------------\n")
     
         eval_all_dataset(model, path="/h/sagar/ece496-capstone/datasets/fi")
-        print("Eval Done!")
+        print("\n----------------Eval Done!----------------\n")
 
 
 if __name__=="__main__":
@@ -220,6 +224,8 @@ if __name__=="__main__":
     parser.add_argument('--load_dir', type=str, default="None")
     parser.add_argument('--load_model', action="store_true")
 
+    parser.add_argument('--print_file', action="store_true")
+
     args = parser.parse_args()
     
     #create default dir name based on specified di
@@ -231,5 +237,11 @@ if __name__=="__main__":
    
     args.save_dir = args.save_dir+desc_str+"/"
     
+    #redirect output to file
+    if args.print_file:
+        orig_stdout = sys.stdout
+        f = open("{}/print_output.txt".format(args.save_dir), 'w')
+        sys.stdout = f
+
     main(args)
 
