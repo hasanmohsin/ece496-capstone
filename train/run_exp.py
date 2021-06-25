@@ -6,18 +6,14 @@ from accuracy import *
 from transformers import get_linear_schedule_with_warmup
 from model import Model
 
+import os
 import argparse
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+import random
 
 from eval_fi import eval_all_dataset
-
-torch.manual_seed(0)
-
-random.seed(0)
-
-np.random.seed(0)
 
 device = torch.device('cuda:' + str(0) if torch.cuda.is_available() else 'cpu')
 
@@ -142,11 +138,19 @@ train_set_type= "pseudo", valid_set_type = "fi"):
 def main(args):
     makedirs(args.save_dir)
     makedirs(args.save_dir + "checkpoints/")
+
+    
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+
+
+
     model = Model(device)
     
     num_actions_train = [3, 4, 5, 7, 8, 9, 10]
     num_actions_valid = args.num_actions_valid
-    batch_size = args.batchsize
+    batch_size = args.bs
     epochs = args.epochs
     lr = args.lr
 
