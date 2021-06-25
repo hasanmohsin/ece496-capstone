@@ -34,20 +34,38 @@ def makedirs(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
 
-def train(model, num_actions_train=[8], num_actions_valid=6, batch_size=4, epochs=25, lr=0.001, MAX_DETECTIONS=20, ckpt_every = 50, save_path =  "/h/sagar/ece496-capstone/weights/t3"):    
-    train_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/ycii") for num_action in num_actions_train]
-    valid_dataset = YouCookII(num_actions_valid, "/h/sagar/ece496-capstone/datasets/ycii")
+def train(model, num_actions_train=4, num_actions_valid = 6, batch_size=4, epochs=25, lr=0.001, MAX_DETECTIONS=20, ckpt_every = 50, save_path =  "/h/sagar/ece496-capstone/weights/t3", 
+train_set_type= "pseudo", valid_set_type = "fi"):    
     
+    # Validation set defaults to test set for now for diagnosing.
+    step_lens = [4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 27]
+    
+    if train_set_type == "pseudo":
+        train_datasets = [YouCookII(num_actions_train, "/h/sagar/ece496-capstone/datasets/ycii_{}".format(num_actions_train))]
+    elif train_set_type == "reg_len":
+        train_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/ycii") for num_action in num_actions_train]
+    #for debug only
+    elif train_set_type == "fi":
+        train_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/fi") for num_action in step_lens]
+
+    if valid_set_type == "fi":
+        valid_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/fi") for num_action in step_lens]
+    elif valid_set_type == "reg":
+        valid_datasets = [YouCookII(num_actions_valid, "/h/sagar/ece496-capstone/datasets/ycii")]
+
     train_size = sum([len(train_dataset) for train_dataset in train_datasets])
-    valid_size = len(valid_dataset)
+    valid_size = sum([len(valid_dataset) for valid_dataset in valid_datasets])
     
     print("Training Dataset Size: {}, Validation Dataset Size: {}".format(train_size, valid_size))
-        
+    print("Effective Batch Size: {} * {} = {}".format(num_actions_train, batch_size, num_actions_train * batch_size))
+    print("Learning Rate: {}, Epochs: {}".format(lr, epochs))
+    
     collate = YouCookIICollate(MAX_DETECTIONS=MAX_DETECTIONS)
     
     train_dataloaders = [DataLoader(train_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate, drop_last=True, worker_init_fn=seed_worker)
                          for train_dataset in train_datasets]
-    valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate, drop_last=True, worker_init_fn=seed_worker)
+    valid_dataloaders = [DataLoader(valid_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate, drop_last=False, worker_init_fn=seed_worker)
+                         for valid_dataset in valid_datasets]
     
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     scheduler = get_linear_schedule_with_warmup(optimizer, int(0.2*epochs), epochs)
@@ -62,15 +80,12 @@ def train(model, num_actions_train=[8], num_actions_valid=6, batch_size=4, epoch
         model.train()
         
         epoch_loss = 0.
-        num_batches = 0
-        
-        total = 0
-        correct = 0
+        datapoints = 0
         
         for train_dataloader in train_dataloaders:
-            for data in train_dataloader:
-                _, bboxes, features, steps, entities, entity_count, _, _ = data
-
+            for input_data in train_dataloader:
+                _, bboxes, features, actions, steps, entities, entity_count, _ = input_data
+                
                 # Zero out any gradients.
                 optimizer.zero_grad()
 
@@ -87,19 +102,19 @@ def train(model, num_actions_train=[8], num_actions_valid=6, batch_size=4, epoch
                 optimizer.step()
 
                 epoch_loss += loss_
-                num_batches += 1
-            
+                datapoints += len(steps) * len(actions[0])
+                            
         # Scheduler update.
         scheduler.step()
-        epoch_loss = epoch_loss / (num_batches * batch_size)
+        epoch_loss = epoch_loss / datapoints
         
         # Save loss and accuracy at each epoch and plot.
         train_loss[epoch] = float(epoch_loss)
-        train_accuracy[epoch] = get_alignment_accuracy(model, train_dataloader, batch_size) 
+        train_accuracy[epoch] = get_alignment_accuracy(model, train_dataloaders) 
         
-        valid_loss[epoch] = get_alignment_loss(model, valid_dataloader, batch_size)
-        valid_accuracy[epoch] = get_alignment_accuracy(model, valid_dataloader, batch_size)
-
+        valid_loss[epoch] = get_alignment_loss(model, valid_dataloaders)
+        valid_accuracy[epoch] = get_alignment_accuracy(model, valid_dataloaders)
+        
         print("Epoch {} - Train Loss: {:.2f}, Validation Loss: {:.2f}, Train Accuracy: {:.2f}, Validation Accuracy: {:.2f}"
               .format(epoch + 1, train_loss[epoch], valid_loss[epoch], train_accuracy[epoch], valid_accuracy[epoch]))
 
@@ -108,7 +123,7 @@ def train(model, num_actions_train=[8], num_actions_valid=6, batch_size=4, epoch
             print("--Checkpointing at epoch {}---".format(epoch+1))
             
             torch.save(model.state_dict(), save_path+"/checkpoints/weights_epoch_{}".format(epoch+1))
-
+    
     plt.figure()
     plt.plot(train_loss, label='train loss')
     plt.plot(valid_loss, label='valid loss')
@@ -118,12 +133,10 @@ def train(model, num_actions_train=[8], num_actions_valid=6, batch_size=4, epoch
     plt.plot(train_accuracy, label='train accuracy')
     plt.plot(valid_accuracy, label='valid accuracy')
     plt.legend()
-    
-    #plt.show()
-    
+        
     plt.savefig("{}/training_curves.png".format(save_path))
-
-    return train_loss, valid_loss, train_accuracy, valid_accuracy, VG, loss_data, data
+        
+    return train_loss, valid_loss, train_accuracy, valid_accuracy, VG, loss_data, input_data
 
 
 def main(args):
