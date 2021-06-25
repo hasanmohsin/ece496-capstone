@@ -145,9 +145,25 @@ train_set_type= "pseudo", valid_set_type = "fi"):
 
 
 def main(args):
+
+     #create default dir name based on specified options
+    if args.no_train:
+        train_type= "Pretrain"
+    else:
+        train_type= "Trained"
+    desc_str = "{} (lr = {}, epochs = {}, bs = {}, num_actions_valid={})".format(train_type, args.lr, args.epochs, args.bs, args.num_actions_valid)
+   
+    args.save_dir = args.save_dir+desc_str+"/"
+    
+
     makedirs(args.save_dir)
     makedirs(args.save_dir + "checkpoints/")
-
+    
+    #redirect output to file
+    if args.print_file:
+        orig_stdout = sys.stdout
+        f = open("{}/print_output.txt".format(args.save_dir), 'w')
+        sys.stdout = f
     
     torch.manual_seed(args.seed)
     random.seed(args.seed)
@@ -228,20 +244,6 @@ if __name__=="__main__":
 
     args = parser.parse_args()
     
-    #create default dir name based on specified di
-    if args.no_train:
-        train_type= "Pretrain"
-    else:
-        train_type= "Trained"
-    desc_str = "{} (lr = {}, epochs = {}, bs = {}, num_actions_valid={})".format(train_type, args.lr, args.epochs, args.bs, args.num_actions_valid)
-   
-    args.save_dir = args.save_dir+desc_str+"/"
-    
-    #redirect output to file
-    if args.print_file:
-        orig_stdout = sys.stdout
-        f = open("{}/print_output.txt".format(args.save_dir), 'w')
-        sys.stdout = f
 
     main(args)
 
