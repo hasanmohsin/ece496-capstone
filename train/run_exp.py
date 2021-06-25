@@ -173,7 +173,13 @@ def main(args):
 
     model = Model(device)
     
-    num_actions_train = [3, 4, 5, 7, 8, 9, 10]
+    if args.train_set_type== "reg":         
+        num_actions_train = [3, 4, 5, 7, 8, 9, 10]     
+    elif args.train_set_type=="pseudo":         
+        num_actions_train = args.num_actions_train     
+    else:         
+        num_actions_train = [4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 27] 
+    
     num_actions_valid = args.num_actions_valid
     batch_size = args.bs
     epochs = args.epochs
@@ -196,7 +202,7 @@ def main(args):
             batch_size=batch_size,
             epochs=epochs,
             lr=lr,
-            ckpt_save_per = args.ckpt_per,
+            ckpt_every = args.ckpt_every,
             save_path = args.save_dir,
             train_set_type = args.train_set_type,
             valid_set_type=  args.valid_set_type
@@ -222,6 +228,7 @@ if __name__=="__main__":
     #training settings
     parser.add_argument('--no_train', action="store_true")
     parser.add_argument('--lr', type=float, default=5e-5)
+    parser.add_argument('--num_actions_train', type = int, default = 4)
     parser.add_argument('--num_actions_valid', type = int, default = 6)
     parser.add_argument('--epochs', type = int, default=200)
     parser.add_argument('--bs', type=int, default=16)
