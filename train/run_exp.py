@@ -241,7 +241,7 @@ if __name__=="__main__":
     parser.add_argument('--ckpt_every', type= int, default = 50)
    
     #save dir for checkpoints + results of eval
-    parser.add_argument('--save_dir', type=str, default = "/h/mhasan/ece496-capstone/train/Results/")
+    parser.add_argument('--save_dir', type=str, default = "/h/mhasan/ece496-capstone/train/ScriptResults/")
 
     #for loading previous models
     parser.add_argument('--load_dir', type=str, default="None")
