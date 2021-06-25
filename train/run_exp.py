@@ -37,16 +37,21 @@ train_set_type= "pseudo", valid_set_type = "fi"):
     step_lens = [4, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 23, 25, 27]
     
     if train_set_type == "pseudo":
+        print("Train set: Pseudo vids of length: {}".format(num_actions_train))
         train_datasets = [YouCookII(num_actions_train, "/h/sagar/ece496-capstone/datasets/ycii_{}".format(num_actions_train))]
-    elif train_set_type == "reg_len":
+    elif train_set_type == "reg":
+        print("Train set: YC2 vids of regular length: {}".format(num_actions_train))
         train_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/ycii") for num_action in num_actions_train]
     #for debug only
     elif train_set_type == "fi":
+        print("Train set: Finding It eval set of length: {}".format(step_lens))
         train_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/fi") for num_action in step_lens]
 
     if valid_set_type == "fi":
+        print("Validation set: Finding It eval set of length: {}".format(step_lens))
         valid_datasets = [YouCookII(num_action, "/h/sagar/ece496-capstone/datasets/fi") for num_action in step_lens]
     elif valid_set_type == "reg":
+        print("Validation set: YC2 vids of regular length: {}".format(num_actions_train))
         valid_datasets = [YouCookII(num_actions_valid, "/h/sagar/ece496-capstone/datasets/ycii")]
 
     train_size = sum([len(train_dataset) for train_dataset in train_datasets])
@@ -172,7 +177,9 @@ def main(args):
             epochs=epochs,
             lr=lr,
             ckpt_save_per = args.ckpt_per,
-            save_path = args.save_dir
+            save_path = args.save_dir,
+            train_set_type = args.train_set_type,
+            valid_set_type=  args.valid_set_type
         )
 
         print("Training Done!")
@@ -198,7 +205,9 @@ if __name__=="__main__":
     parser.add_argument('--num_actions_valid', type = int, default = 6)
     parser.add_argument('--epochs', type = int, default=200)
     parser.add_argument('--bs', type=int, default=16)
-    
+    parser.add_argument('--train_set_type', type= str, default="pseudo")
+    parser.add_argument('--valid_set_type', type=str, default="fi")
+
     #eval settings
     parser.add_argument('--no_eval', action="store_true")    
     
