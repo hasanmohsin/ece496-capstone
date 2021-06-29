@@ -304,7 +304,7 @@ def vis_eval_im(model, num_actions, index, root, gt_bbox_all=None):
     return VG, RR, mean_iou
 
 
-def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0.5):
+def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0.5, print_stuff = False):
     """
     Return the mean IoUs and accuracy for model output, random, and best candidates
     model: model for inferencing
@@ -359,13 +359,15 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
     
     num_ents = 0
     
-    for action_idx, action_entities in enumerate(entities[:-1]):        
-        print('--------------------------------------------------')
-        print('Action {}: {}'.format(action_idx + 1, actions[action_idx]))
+    for action_idx, action_entities in enumerate(entities[:-1]):     
+        if print_stuff:
+            print('--------------------------------------------------')
+            print('Action {}: {}'.format(action_idx + 1, actions[action_idx]))
 
         # if gt doesn't have bbox, skip (doesn't count towards IoU) - since model must ground all entities
         if len(action_entities) == 0:
-            print('No entities detected for this action.')
+            if print_stuff:
+                print('No entities detected for this action.')
 
         frame_path = None
         prev_frame_path = None
@@ -396,7 +398,8 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
                                       gt_vid_bbox=gt_vid_bbox)
             
             if gt_bbox_info is None:
-                print('This entity has no ground truth bounding box')
+                if print_stuff:
+                    print('This entity has no ground truth bounding box')
                 continue
             
             #gt_frame, gt_bbox
@@ -407,7 +410,8 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
                        gt_bbox_info['bbox']['h']]
             
             if gt_bbox[0] is None or gt_bbox[1] is None or gt_bbox[2] is None or gt_bbox[3] is None:
-                print('Atleast one of the bounding box coordinates is missing.')
+                if print_stuff:
+                    print('Atleast one of the bounding box coordinates is missing.')
                 continue
             
             #print(gt_frame)
@@ -442,24 +446,34 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
             for candidate_bbox in frame_candidate_bboxes:
                 candidate_iou = compute_iou_from_normalized_coords(candidate_bbox, frame_width, frame_height, gt_bbox)
                 best_iou = max(best_iou, candidate_iou)
-            print('Best IoU possible = {}'.format(best_iou))
+                
+            if print_stuff:
+                print('Best IoU possible = {}'.format(best_iou))
+            
             if best_iou >= acc_thresh:
                 best_correct += 1
             
             # Pick a random candidate from all candidates for current action
             rand_bbox = frame_candidate_bboxes[random.randint(0,NUM_CANDIDATES_PER_STEP-1)]
             rand_iou = compute_iou_from_normalized_coords(rand_bbox, frame_width, frame_height, gt_bbox)
-            print('Random Candidate IoU = {}'.format(rand_iou))
+            
+            if print_stuff:
+                print('Random Candidate IoU = {}'.format(rand_iou))
+                
+                
             if rand_iou >= acc_thresh:
                 rand_correct += 1
 
             # Calculate model output IoU
             ours_iou = compute_iou_from_normalized_coords(bbox, frame_width, frame_height, gt_bbox)
-            print('Chosen Frame IoU: {}'.format(ours_iou))
+            
+            if print_stuff:
+                print('Chosen Frame IoU: {}'.format(ours_iou))
             if ours_iou >= acc_thresh:
                 ours_correct += 1
             if ours_iou > best_iou:
-                print('ERROR: Best IoU < Chosen IoU')
+                 if print_stuff:
+                    print('ERROR: Best IoU < Chosen IoU')
                 
             mean_best_iou += best_iou
             mean_rand_iou += rand_iou
@@ -471,19 +485,21 @@ def compute_eval_ious(model, num_actions, index, root, gt_bbox_all, acc_thresh=0
     mean_ours_iou /= num_ents
     mean_rand_iou /= num_ents
     
-    print('Mean Upper Bound IoU: {}, Mean Random IoU: {}, Mean Model IoU: {}'.format(mean_best_iou, 
+    if print_stuff:
+        print('Mean Upper Bound IoU: {}, Mean Random IoU: {}, Mean Model IoU: {}'.format(mean_best_iou, 
                                                                                      mean_rand_iou, 
                                                                                      mean_ours_iou))
     
     best_acc = best_correct / num_ents
     rand_acc = rand_correct / num_ents
     ours_acc = ours_correct / num_ents
-    print('Top-1 acc@{}:\nProposal Upper Bound: {}, Random: {}, Model: {}'.format(acc_thresh, best_acc, rand_acc, ours_acc))
+    if print_stuff:
+        print('Top-1 acc@{}:\nProposal Upper Bound: {}, Random: {}, Model: {}'.format(acc_thresh, best_acc, rand_acc, ours_acc))
     
     return mean_best_iou, mean_rand_iou, mean_ours_iou, best_acc, rand_acc, ours_acc
 
 
-def eval_all_dataset(model, acc_thresh=0.5, path='/h/sagar/ece496-capstone/datasets/fi'):
+def eval_all_dataset(model, acc_thresh=0.5, num_actions_list=None, path='/h/sagar/ece496-capstone/datasets/fi', print_stuff=False):
     """
     Print VG evaluation scores for FI dataset
     model: model for inferencing
@@ -504,14 +520,16 @@ def eval_all_dataset(model, acc_thresh=0.5, path='/h/sagar/ece496-capstone/datas
     all_vid_ours_acc = 0.0
 
     vid_count = 0
-
-    num_actions_list = [int(num_actions) for num_actions in sorted(os.listdir(FI))]
-
+    
+    #eval all num actions
+    if num_actions_list is None:
+        num_actions_list = [int(num_actions) for num_actions in sorted(os.listdir(FI))]
+    
     for num_actions in num_actions_list:
         indices = len(os.listdir(os.path.join(FI, str(num_actions))))
 
         for idx in range(indices):
-            mean_best_iou_vid, mean_rand_iou_vid, mean_ours_iou_vid, best_acc, rand_acc, ours_acc = compute_eval_ious(model, num_actions=num_actions, index=idx, root=FI, gt_bbox_all=None, acc_thresh=acc_thresh)
+            mean_best_iou_vid, mean_rand_iou_vid, mean_ours_iou_vid, best_acc, rand_acc, ours_acc = compute_eval_ious(model, num_actions=num_actions, index=idx, root=FI, gt_bbox_all=None, acc_thresh=acc_thresh, print_stuff = print_stuff)
 
             mean_best_ious.append(mean_best_iou_vid)
             mean_rand_ious.append(mean_rand_iou_vid)
@@ -535,21 +553,23 @@ def eval_all_dataset(model, acc_thresh=0.5, path='/h/sagar/ece496-capstone/datas
     all_vid_rand_acc /= vid_count
     all_vid_ours_acc /= vid_count
     
-    print('--------------------------------------------------')
-    print('EVALUATION SUMMARY')
-    print('Number of videos: {}'.format(vid_count))
-    print('Mean IoU:')
-    print('\tProposal Upper Bound: {}'.format(all_vid_mean_best_iou))
-    print('\tRandom: {}'.format(all_vid_mean_rand_iou))
-    print('\tModel: {}'.format(all_vid_mean_ours_iou))
+    if print_stuff:
+        print('--------------------------------------------------')
+        print('EVALUATION SUMMARY')
+        print('Number of videos: {}'.format(vid_count))
+        print('Mean IoU:')
+        print('\tProposal Upper Bound: {}'.format(all_vid_mean_best_iou))
+        print('\tRandom: {}'.format(all_vid_mean_rand_iou))
+        print('\tModel: {}'.format(all_vid_mean_ours_iou))
+
+        print('Top-1 accuracy@{}:'.format(acc_thresh))
+        print('\tProposal Upper Bound: {:.1f}%'.format(all_vid_best_acc*100))
+        print('\tRandom: {:.1f}%'.format(all_vid_rand_acc*100))
+        print('\tModel: {:.1f}%'.format(all_vid_ours_acc*100))
+        print('--------------------------------------------------')
     
-    print('Top-1 accuracy@{}:'.format(acc_thresh))
-    print('\tProposal Upper Bound: {:.1f}%'.format(all_vid_best_acc*100))
-    print('\tRandom: {:.1f}%'.format(all_vid_rand_acc*100))
-    print('\tModel: {:.1f}%'.format(all_vid_ours_acc*100))
-    print('--------------------------------------------------')
-    
-    return
+    #mean performance ours, best, rand, and then top-1 acc ours, best, rand
+    return all_vid_mean_ours_iou, all_vid_mean_best_iou, all_vid_mean_rand_iou, all_vid_ours_acc, all_vid_best_acc, all_vid_rand_acc
 
 
 def eval_fi():
